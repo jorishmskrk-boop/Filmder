@@ -1,0 +1,68 @@
+{
+  "entities": {
+    "Movie": {
+      "title": "Movie",
+      "description": "Details about a single movie",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "year": { "type": "string" },
+        "rating": { "type": "number" },
+        "genres": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "synopsis": { "type": "string" },
+        "providers": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "backdrop": { "type": "string" }
+      },
+      "required": ["id", "title", "year", "rating", "genres", "synopsis", "providers", "backdrop"]
+    },
+    "Room": {
+      "title": "Room",
+      "description": "A co-op movie selection room session",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "country": { "type": "string" },
+        "providers": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "vibe": { "type": "string" },
+        "movies": {
+          "type": "array",
+          "items": { "schema": "Movie" }
+        },
+        "users": {
+          "type": "object",
+          "description": "Mapping from user UID to display name"
+        },
+        "swipes": {
+          "type": "object",
+          "description": "Swipes mapping user_uid to movie_id booleans"
+        },
+        "matches": {
+          "type": "array",
+          "items": { "schema": "Movie" }
+        },
+        "reactions": {
+          "type": "object",
+          "description": "Mapping from user UID to their active reaction"
+        }
+      },
+      "required": ["id", "createdAt", "country", "providers", "vibe"]
+    }
+  },
+  "firestore": {
+    "/artifacts/flixmatch-default-id/public/data/rooms/{roomCode}": {
+      "schema": "Room",
+      "description": "Individual film match room session metadata, swipes, actions, and match declarations."
+    }
+  }
+}

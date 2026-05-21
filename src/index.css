@@ -1,0 +1,49 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Montserrat", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+body {
+  background-color: #12121d; /* Deep Space foundation */
+  color: #e3e0f1; /* Crisp, high-contrast light lavender text for dark mode */
+  font-family: var(--font-sans);
+}
+
+/* Glassmorphism containers */
+.glass-card {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+/* Heart Red bloom and glow effects */
+.bloom-primary {
+  box-shadow: 0 0 30px rgba(255, 86, 55, 0.3);
+}
+
+.glow-button {
+  background: linear-gradient(135deg, #ff5637 0%, #ba1c00 100%);
+  box-shadow: 0 4px 20px rgba(255, 86, 55, 0.4);
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-8px) rotate(1.5deg); }
+}
+
+.animate-float {
+  animation: float 5s ease-in-out infinite;
+}
+
+/* Background gradient mesh values */
+.bg-gradient-mesh {
+  background: radial-gradient(circle at 20% 20%, rgba(255, 86, 55, 0.15) 0%, transparent 40%),
+              radial-gradient(circle at 80% 80%, rgba(140, 127, 255, 0.1) 0%, transparent 40%);
+}
+

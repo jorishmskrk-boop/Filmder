@@ -1,0 +1,75 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net: Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidRoomCode(code) {
+      return code is string && code.size() == 4 && code.matches('^[0-9]+$');
+    }
+
+    // Main validation function for a Room
+    function isValidRoom(data) {
+      return data.id is string
+        && data.id.size() == 4
+        && (data.createdAt is int || data.createdAt is float)
+        && data.country is string
+        && data.country.size() <= 10
+        && data.vibe is string
+        && data.vibe.size() <= 100
+        && data.providers is list
+        && data.providers.size() <= 15
+        && (data.movies is list && data.movies.size() <= 50)
+        && (data.users is map)
+        && (data.swipes is map)
+        && (data.matches is list && data.matches.size() <= 50)
+        && (data.reactions is map);
+    }
+
+    // Custom Matcher Room path
+    match /artifacts/flixmatch-default-id/public/data/rooms/{roomCode} {
+      allow get: if isSignedIn() && isValidRoomCode(roomCode);
+      
+      // Allow list reads (highly restricted, only with exact filter or just block list completely)
+      allow list: if false;
+
+      // Allow create if valid room details and the user is registering themselves in the users dict
+      allow create: if isSignedIn()
+        && isValidRoomCode(roomCode)
+        && isValidRoom(request.resource.data);
+
+      // Allow update if the user is in the room and only edits users, swipes, matches, properties, or reactions
+      allow update: if isSignedIn()
+        && isValidRoomCode(roomCode)
+        && isValidRoom(request.resource.data)
+        && (
+          // Allow joining: user adds theirUID to the users map
+          (request.resource.data.users.keys().hasAll(resource.data.users.keys())
+          && request.resource.data.users.keys().size() <= 2)
+          ||
+          // Allow swiping: user modifies their swipes section in swipes map
+          (request.resource.data.swipes.keys().size() <= 2)
+          ||
+          // Allow reactions: user edits their reaction inside reactions map
+          (request.resource.data.reactions.keys().size() <= 2)
+          ||
+          // Allow matches additions
+          (request.resource.data.matches.size() >= resource.data.matches.size())
+        );
+
+      allow delete: if false; // Rooms are never deleted via client
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Filmder",
+  "description": "A modern, production-ready real-time co-op movie selection app to match and swipe movies with your partner.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
