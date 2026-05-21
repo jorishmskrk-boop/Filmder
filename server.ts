@@ -142,8 +142,8 @@ app.post("/api/movies", async (req, res) => {
         .filter(id => id !== undefined);
       const providerIdString = providerIds.join("|");
 
-      // Choose a random curation strategy to yield highly dynamic lists
-      const curationPlan = Math.floor(Math.random() * 5);
+      // Choose a random curation strategy to yield highly dynamic lists (9 plans)
+      const curationPlan = Math.floor(Math.random() * 9);
       let page1 = Math.floor(Math.random() * 10) + 1;
       let page2 = page1 + 1;
       let customParams = "";
@@ -178,6 +178,30 @@ app.post("/api/movies", async (req, res) => {
           sortParam = "popularity.desc";
           customParams = "&vote_count.gte=100&vote_count.lte=3000&vote_average.gte=7.1";
           page1 = Math.floor(Math.random() * 8) + 1;
+          page2 = page1 + 1;
+          break;
+        case 5: // Curation F: High-energy Friday Popcorn & Easy watch (2000 - present)
+          sortParam = "popularity.desc";
+          customParams = "&primary_release_date.gte=2000-01-01&vote_average.gte=6.3";
+          page1 = Math.floor(Math.random() * 6) + 1;
+          page2 = page1 + 1;
+          break;
+        case 6: // Curation G: Mind-bending plots or Intense Thrills (Thrilling Sci-Fi & Mysteries)
+          sortParam = "popularity.desc";
+          customParams = "&with_genres=878,53,9648&vote_average.gte=6.8";
+          page1 = Math.floor(Math.random() * 5) + 1;
+          page2 = page1 + 1;
+          break;
+        case 7: // Curation H: Cozy Couch Date Night (Feel-good, comedies, romance, animation, adventures)
+          sortParam = "popularity.desc";
+          customParams = "&with_genres=35,10749,16,12&vote_average.gte=6.5";
+          page1 = Math.floor(Math.random() * 6) + 1;
+          page2 = page1 + 1;
+          break;
+        case 8: // Curation I: Heritage Cinema Arthouse & Golden Classics (1950 - 1989)
+          sortParam = "vote_average.desc";
+          customParams = "&primary_release_date.gte=1950-01-01&primary_release_date.lte=1989-12-31&vote_count.gte=150&vote_average.gte=7.4";
+          page1 = Math.floor(Math.random() * 4) + 1;
           page2 = page1 + 1;
           break;
       }
@@ -318,7 +342,7 @@ app.post("/api/movies", async (req, res) => {
     const promptString = `Genereer 15 populaire of veelgeprezen films die te streamen zijn in ${selectedCountry} op: [${providerListStr}]. ${genresPrompt} ${pickedFocus} Belangrijk: voor het attribuut 'providers' in het JSON resultaat mag je alleen de specifieke streamingsdienst opgeven waarop die specifieke film daadwerkelijk te zien is (bijvoorbeeld ['netflix'] of ['disney']). Zet er dus niet blindelings de hele lijst [${providerListStr}] in!`;
 
     const systemInstruction = 
-      "Je bent Filmder, een gezellige en enthousiaste filmkenner. Output STRIKT een JSON array van objecten die voldoen aan de Movie interface. Alle genres/categorieën moeten in natuurlijk Nederlands staan (bijv. 'Actie', 'Drama', 'Komedie', 'Muziek', 'Animatie', 'Documentaire', 'Spanning', 'Klassieker' in plaats van Engelse woorden). De synopsis MOET exact één pakkende, prikkelende en menselijke Nederlandse zin zijn die klinkt als een persoonlijke tip van een vriend, zonder AI-clichés. De backdrop is een hoge kwaliteit landschapsfoto van Unsplash passende bij de sfeer van de film. Zorg dat het 'language' attribuut de gesproken taal van de film in natuurlijk Nederlands bevat (bijvoorbeeld 'Engels', 'Nederlands', 'Frans', 'Japans', 'Spaans').";
+      "Je bent Filmder, een gezellige en enthousiaste filmkenner. Output STRIKT een JSON array van objecten die voldoen aan de Movie interface. Alle genres/categorieën moeten in natuurlijk Nederlands staan (bijv. 'Actie', 'Drama', 'Komedie', 'Muziek', 'Animatie', 'Documentaire', 'Spanning', 'Klassieker' in plaats van Engelse woorden). De synopsis MOET exact één pakkende, prikkelende en menselijke Nederlandse zin zijn die klinkt als een persoonlijke tip van een vriend, zonder AI-clichés. De backdrop is een hoge kwaliteit landschapsfoto van Unsplash passende bij de sfeer van de film. Zorg dat het 'language' attribuut de gesproken taal van de film in natuurlijk Nederlands bevat (bijvoorbeeld 'Engels', 'Nederlands', 'Frans', 'Japans', 'Spaans'). Zorg voor een uiterst gevarieerde en internationaal aansprekende selectie van hooggewaardeerde Hollywood blockbusters, bekende Europese cinema en geliefde klassiekers. Voorkom te allen tijde dat de selectie overheerst wordt door specifieke niche-stijlen of één regionale filmmarkt zoals Bollywood of uitsluitend obscure arthouse films, tenzij de sfeer/genres hier specifiek om vragen.";
 
     const response = await ai.models.generateContent({
       model: "gemini-3.5-flash",

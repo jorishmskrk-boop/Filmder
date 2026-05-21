@@ -1,5 +1,6 @@
 export const COUNTRIES = [
   { code: "NL", name: "Nederland (NL)" },
+  { code: "IE", name: "Ierland (IE)" },
   { code: "US", name: "Verenigde Staten (US)" },
   { code: "GB", name: "Verenigd Koninkrijk (GB)" },
   { code: "CA", name: "Canada (CA)" },

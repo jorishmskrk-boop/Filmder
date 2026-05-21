@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, SVGProps } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence, useMotionValue, useTransform } from "motion/react";
 import { Heart, X, Sparkles, AlertCircle, Award, Star, RefreshCw, MessageSquare, Info, Play } from "lucide-react";
 import { Movie, Room } from "../types";
 import Confetti from "./Confetti";
+import ProviderLogo from "./ProviderLogo";
 
 interface SwipeScreenProps {
   room: Room;
@@ -10,6 +11,7 @@ interface SwipeScreenProps {
   onSwipe: (movieId: string, liked: boolean) => void;
   onSendReaction: (emoji: string) => void;
   onResetDeck: () => void;
+  onFetchNewBatch: () => void;
 }
 
 const REACTION_MAP: Record<string, { label: string; color: string }> = {
@@ -26,6 +28,7 @@ export default function SwipeScreen({
   onSwipe,
   onSendReaction,
   onResetDeck,
+  onFetchNewBatch,
 }: SwipeScreenProps) {
   // Find partner details
   const usersList = Object.entries(room.users || {});
@@ -43,6 +46,14 @@ export default function SwipeScreen({
 
   // Handle active matching overlay
   const [celebrationMatch, setCelebrationMatch] = useState<Movie | null>(null);
+
+  // Track swipe direction for exit animation custom propagation
+  const [swipeDirection, setSwipeDirection] = useState<"like" | "dislike" | null>(null);
+
+  // Reset direction on card change
+  useEffect(() => {
+    setSwipeDirection(null);
+  }, [unswipedMovies[0]?.id]);
 
   // Monitor reactions
   useEffect(() => {
@@ -67,18 +78,29 @@ export default function SwipeScreen({
     }
   }, [room.reactions, partnerId, partnerName]);
 
-  // Monitor matched movies list to trigger full screen celebration
-  const prevMatchesLength = useRef(room.matches?.length || 0);
+  // Monitor matched movies list to trigger full screen celebration only when both players are finished
+  const hasCelebrated = useRef(false);
   useEffect(() => {
     const currentMatches = room.matches || [];
-    if (currentMatches.length > prevMatchesLength.current) {
-      const newestMatch = currentMatches[currentMatches.length - 1];
-      setCelebrationMatch(newestMatch);
-      prevMatchesLength.current = currentMatches.length;
+    const totalMovies = (room.movies || []).length;
+    if (totalMovies === 0) return;
+
+    const users = Object.keys(room.users || {});
+    const allPlayersFinished = users.every(uid => {
+      const swipes = room.swipes?.[uid] || {};
+      return Object.keys(swipes).length >= totalMovies;
+    });
+
+    if (allPlayersFinished && currentMatches.length > 0) {
+      if (!hasCelebrated.current) {
+        const newestMatch = currentMatches[currentMatches.length - 1];
+        setCelebrationMatch(newestMatch);
+        hasCelebrated.current = true;
+      }
     } else {
-      prevMatchesLength.current = currentMatches.length;
+      hasCelebrated.current = false;
     }
-  }, [room.matches]);
+  }, [room.matches, room.users, room.swipes, room.movies]);
 
   // Swiping keyboard events
   useEffect(() => {
@@ -88,8 +110,10 @@ export default function SwipeScreen({
 
       const topMovie = unswipedMovies[0];
       if (e.key === "ArrowLeft") {
+        setSwipeDirection("dislike");
         onSwipe(topMovie.id, false);
       } else if (e.key === "ArrowRight") {
+        setSwipeDirection("like");
         onSwipe(topMovie.id, true);
       }
     };
@@ -130,90 +154,15 @@ export default function SwipeScreen({
               <div className="absolute inset-0 bg-[#0c0a0e]/60 rounded-[32px] border border-white/5 translate-y-4 scale-95 opacity-30 pointer-events-none transition-all duration-300 animate-pulse"></div>
             )}
             
-            <AnimatePresence mode="popLayout">
+            <AnimatePresence mode="popLayout" custom={swipeDirection}>
               {currentMovie ? (
-                <motion.div
+                <CinephileCard
                   key={currentMovie.id}
-                  initial={{ scale: 0.95, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={(custom) => ({
-                    x: custom === "like" ? 400 : -450,
-                    rotate: custom === "like" ? 15 : -15,
-                    opacity: 0,
-                    transition: { duration: 0.3 }
-                  })}
-                  className="absolute inset-0 bg-[#12121d] rounded-[32px] border border-white/10 overflow-hidden shadow-2xl group flex flex-col justify-between"
-                >
-                  <div 
-                    className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-[1.02]" 
-                    style={{ backgroundImage: `url('${currentMovie.backdrop}')` }}
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent"></div>
-                  </div>
-
-                  <div className="absolute inset-0 p-6 md:p-8 flex flex-col justify-end z-10 pointer-events-none">
-                    <div className="flex items-center gap-2 mb-3">
-                      {currentMovie.genres.slice(0, 3).map((g, idx) => (
-                        <span
-                          key={idx}
-                          className="px-3 py-1 bg-[#ff5637]/15 border border-[#ff5637]/30 text-[#ffb4a5] text-[10px] font-bold uppercase tracking-wider rounded-full select-none"
-                        >
-                          {g}
-                        </span>
-                      ))}
-                      <div className="ml-auto flex items-center gap-2">
-                        {currentMovie.trailerUrl && (
-                          <a
-                            id="movie-trailer-link"
-                            href={currentMovie.trailerUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="pointer-events-auto flex items-center gap-1 bg-red-655 hover:bg-red-600 border border-red-500/25 px-2.5 py-1.5 text-[9px] font-extrabold text-white uppercase tracking-widest rounded-full shrink-0 cursor-pointer shadow-md transition-all active:scale-95 hover:scale-105"
-                            title="Bekijk de trailer op YouTube"
-                          >
-                            <Play className="w-2.5 h-2.5 fill-white text-white shrink-0" />
-                            Trailer
-                          </a>
-                        )}
-                        <div className="flex items-center gap-1 bg-black/60 backdrop-blur-md border border-white/5 px-2.5 py-1.5 rounded-full">
-                          <Star className="w-3.5 h-3.5 text-[#ffdb3c] fill-[#ffdb3c] shrink-0" />
-                          <span className="text-xs font-bold text-[#ffdb3c]">{currentMovie.rating}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <h2 className="text-3xl md:text-4xl font-black text-white mb-2 leading-tight tracking-tight drop-shadow-md font-display">
-                      {currentMovie.title}
-                    </h2>
-
-                    <p className="text-slate-300 text-xs md:text-sm line-clamp-2 italic mb-4 font-sans leading-relaxed">
-                      "{currentMovie.synopsis}"
-                    </p>
-
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-1.5 flex-wrap text-xs font-semibold text-slate-300">
-                        <span className="px-1.5 py-0.5 bg-[#8c7fff]/15 border border-[#8c7fff]/30 text-[#cec9ff] text-[9px] font-extrabold rounded tracking-wider shrink-0 select-none">
-                          STREAM
-                        </span>
-                        {currentMovie.providers.map((p, pIdx) => (
-                          <span key={pIdx} className="px-2 py-0.5 bg-slate-900 border border-white/5 text-[#e3e0f1] text-[10px] rounded-md font-bold uppercase tracking-wider shrink-0 select-none">
-                            {p === "disney" ? "Disney+" : p === "prime" ? "Prime Video" : p === "apple" ? "Apple TV" : p === "npostart" ? "NPO Start" : p.charAt(0).toUpperCase() + p.slice(1)}
-                          </span>
-                        ))}
-                      </div>
-                      <div className="ml-auto flex items-center gap-1.5 shrink-0 select-none">
-                        {currentMovie.language && (
-                          <span className="px-2 py-0.5 bg-slate-905 bg-slate-900 border border-white/5 text-slate-300 text-[10px] rounded-md font-sans font-semibold tracking-wide">
-                            {currentMovie.language}
-                          </span>
-                        )}
-                        <span className="px-2 py-0.5 bg-slate-905 bg-slate-900 border border-white/5 text-slate-400 text-[10px] rounded-md font-mono font-bold">
-                          {currentMovie.year}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
+                  movie={currentMovie}
+                  onSwipe={onSwipe}
+                  swipeDirection={swipeDirection}
+                  setSwipeDirection={setSwipeDirection}
+                />
               ) : (
                 // Deck empty fallback view
                 <motion.div
@@ -230,14 +179,24 @@ export default function SwipeScreen({
                       Er zijn geen films meer beschikbaar binnen je geselecteerde criteria en streamingdiensten. Pas de lobby-instellingen aan of herlaad de stapel!
                     </p>
                   </div>
-                  <button
-                    id="reset-deck-btn"
-                    onClick={onResetDeck}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-bold bg-[#12121d] border border-white/10 hover:border-[#ff5637] text-white rounded-xl cursor-pointer hover:bg-black/30 transition-colors"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin-reverse" />
-                    Stapel Films Herladen
-                  </button>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button
+                      id="reset-deck-btn"
+                      onClick={onResetDeck}
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold bg-[#12121d] border border-white/10 hover:border-white/30 text-slate-300 rounded-xl cursor-pointer hover:bg-black/30 transition-colors"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin-reverse" />
+                      Geziene films herhalen
+                    </button>
+                    <button
+                      id="fetch-new-deck-btn"
+                      onClick={onFetchNewBatch}
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold bg-gradient-to-r from-[#ff5637] to-[#ba1c00] text-white rounded-xl cursor-pointer hover:opacity-95 transition-all shadow-md active:scale-95"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Gloednieuwe stapel ophalen
+                    </button>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -249,7 +208,10 @@ export default function SwipeScreen({
               <button
                 id="swipe-dislike-btn"
                 type="button"
-                onClick={() => onSwipe(currentMovie.id, false)}
+                onClick={() => {
+                  setSwipeDirection("dislike");
+                  onSwipe(currentMovie.id, false);
+                }}
                 className="w-16 h-16 rounded-full border border-white/10 bg-[#12121d]/80 flex items-center justify-center text-slate-400 hover:text-white hover:border-white/30 hover:scale-105 transition-all cursor-pointer shadow-lg active:scale-95"
                 title="Slecht weigeren (Links)"
               >
@@ -259,7 +221,10 @@ export default function SwipeScreen({
               <button
                 id="swipe-like-btn"
                 type="button"
-                onClick={() => onSwipe(currentMovie.id, true)}
+                onClick={() => {
+                  setSwipeDirection("like");
+                  onSwipe(currentMovie.id, true);
+                }}
                 className="w-24 h-24 rounded-full bg-gradient-to-br from-[#ff5637] to-[#ba1c00] flex items-center justify-center text-white shadow-xl shadow-red-500/20 ring-4 ring-[#ff5637]/10 group hover:scale-[1.06] transition-all active:scale-0.96 cursor-pointer"
                 title="Leuk vinden (Rechts)"
               >
@@ -437,14 +402,14 @@ export default function SwipeScreen({
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">
                   Te zien op jouw diensten:
                 </span>
-                <div className="flex flex-wrap gap-1 justify-center">
+                <div className="flex flex-wrap gap-2 justify-center items-center">
                   {celebrationMatch.providers.map((p, idx) => (
-                    <span
+                    <div
                       key={idx}
-                      className="px-2.5 py-1 rounded-full bg-[#8c7fff]/15 text-[#cec9ff] border border-[#8c7fff]/25 text-[10px] font-bold uppercase tracking-wider"
+                      className="w-14 h-9 overflow-hidden rounded-xl shadow-md shrink-0 select-none"
                     >
-                      {p === "disney" ? "Disney+" : p === "prime" ? "Prime Video" : p === "apple" ? "Apple TV" : p === "npostart" ? "NPO Start" : p.charAt(0).toUpperCase() + p.slice(1)}
-                    </span>
+                      <ProviderLogo id={p} active={true} size={16} />
+                    </div>
                   ))}
                 </div>
               </div>
@@ -477,6 +442,141 @@ export default function SwipeScreen({
       </AnimatePresence>
 
     </div>
+  );
+}
+
+interface CinephileCardProps {
+  key?: string | number;
+  movie: Movie;
+  onSwipe: (movieId: string, liked: boolean) => void;
+  swipeDirection: "like" | "dislike" | null;
+  setSwipeDirection: (direction: "like" | "dislike" | null) => void;
+}
+
+function CinephileCard({ movie, onSwipe, swipeDirection, setSwipeDirection }: CinephileCardProps) {
+  const x = useMotionValue(0);
+  const rotate = useTransform(x, [-200, 200], [-25, 25]);
+  const opacity = useTransform(x, [-200, -150, 0, 150, 200], [0.5, 1, 1, 1, 0.5]);
+
+  // Stamp overlay opacities
+  const likeOpacity = useTransform(x, [0, 100], [0, 1]);
+  const nopeOpacity = useTransform(x, [-100, 0], [1, 0]);
+
+  return (
+    <motion.div
+      key={movie.id}
+      custom={swipeDirection}
+      initial={{ scale: 0.95, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      exit={(direction) => ({
+        x: direction === "like" ? 450 : direction === "dislike" ? -450 : 0,
+        rotate: direction === "like" ? 18 : direction === "dislike" ? -18 : 0,
+        opacity: 0,
+        scale: 0.9,
+        transition: { duration: 0.25 }
+      })}
+      drag="x"
+      dragConstraints={{ left: 0, right: 0 }}
+      dragElastic={0.7}
+      style={{ x, rotate, opacity }}
+      onDragEnd={(event, info) => {
+        const swipeThreshold = 130;
+        if (info.offset.x > swipeThreshold) {
+          setSwipeDirection("like");
+          onSwipe(movie.id, true);
+        } else if (info.offset.x < -swipeThreshold) {
+          setSwipeDirection("dislike");
+          onSwipe(movie.id, false);
+        }
+      }}
+      className="absolute inset-0 bg-[#12121d] rounded-[32px] border border-white/10 overflow-hidden shadow-2xl group flex flex-col justify-between cursor-grab active:cursor-grabbing select-none"
+    >
+      <div 
+        className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-[1.02]" 
+        style={{ backgroundImage: `url('${movie.backdrop}')` }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent"></div>
+      </div>
+
+      {/* LIKE Badge Stamp Overlay */}
+      <motion.div
+        style={{ opacity: likeOpacity }}
+        className="absolute top-10 left-10 border-4 border-emerald-500 text-emerald-500 font-extrabold text-2xl uppercase px-4 py-1.5 rounded-xl z-25 pointer-events-none select-none tracking-widest font-mono shadow-md shadow-emerald-500/10 bg-black/45 backdrop-blur-xs"
+      >
+        VIND IK LEUK!
+      </motion.div>
+
+      {/* NOPE Badge Stamp Overlay */}
+      <motion.div
+        style={{ opacity: nopeOpacity }}
+        className="absolute top-10 right-10 border-4 border-rose-500 text-rose-500 font-extrabold text-2xl uppercase px-4 py-1.5 rounded-xl z-25 pointer-events-none select-none tracking-widest font-mono shadow-md shadow-rose-500/10 bg-black/45 backdrop-blur-xs"
+      >
+        NEE BEDANKT
+      </motion.div>
+
+      <div className="absolute inset-0 p-6 md:p-8 flex flex-col justify-end z-10 pointer-events-none">
+        <div className="flex items-center gap-2 mb-3">
+          {movie.genres.slice(0, 3).map((g, idx) => (
+            <span
+              key={idx}
+              className="px-3 py-1 bg-[#ff5637]/15 border border-[#ff5637]/30 text-[#ffb4a5] text-[10px] font-bold uppercase tracking-wider rounded-full select-none"
+            >
+              {g}
+            </span>
+          ))}
+          <div className="ml-auto flex items-center gap-2">
+            {movie.trailerUrl && (
+              <a
+                id="movie-trailer-link"
+                href={movie.trailerUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="pointer-events-auto flex items-center gap-1 bg-gradient-to-r from-red-655 to-red-600 hover:from-red-500 hover:to-red-600 border border-red-500/25 px-2.5 py-1.5 text-[9px] font-extrabold text-white uppercase tracking-widest rounded-full shrink-0 cursor-pointer shadow-md transition-all active:scale-95 hover:scale-105"
+                title="Bekijk de trailer op YouTube"
+              >
+                <Play className="w-2.5 h-2.5 fill-white text-white shrink-0" />
+                Trailer
+              </a>
+            )}
+            <div className="flex items-center gap-1 bg-black/60 backdrop-blur-md border border-white/5 px-2.5 py-1.5 rounded-full">
+              <Star className="w-3.5 h-3.5 text-[#ffdb3c] fill-[#ffdb3c] shrink-0" />
+              <span className="text-xs font-bold text-[#ffdb3c]">{movie.rating}</span>
+            </div>
+          </div>
+        </div>
+
+        <h2 className="text-3xl md:text-4xl font-black text-white mb-2 leading-tight tracking-tight drop-shadow-md font-display">
+          {movie.title}
+        </h2>
+
+        <p className="text-slate-300 text-xs md:text-sm line-clamp-2 italic mb-4 font-sans leading-relaxed">
+          "{movie.synopsis}"
+        </p>
+
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1.5 flex-wrap text-xs font-semibold text-slate-300">
+            <span className="px-1.5 py-0.5 bg-[#8c7fff]/15 border border-[#8c7fff]/25 text-[#cec9ff] text-[9px] font-extrabold rounded tracking-wider shrink-0 select-none">
+              STREAM
+            </span>
+            {movie.providers.map((p, pIdx) => (
+              <div key={pIdx} className="w-12 h-8 overflow-hidden rounded-xl shrink-0 select-none shadow">
+                <ProviderLogo id={p} active={true} size={14} />
+              </div>
+            ))}
+          </div>
+          <div className="ml-auto flex items-center gap-1.5 shrink-0 select-none">
+            {movie.language && (
+              <span className="px-2 py-0.5 bg-slate-900 border border-white/5 text-slate-300 text-[10px] rounded-md font-sans font-semibold tracking-wide">
+                {movie.language}
+              </span>
+            )}
+            <span className="px-2 py-0.5 bg-slate-900 border border-white/5 text-slate-400 text-[10px] rounded-md font-mono font-bold">
+              {movie.year}
+            </span>
+          </div>
+        </div>
+      </div>
+    </motion.div>
   );
 }
 

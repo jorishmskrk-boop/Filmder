@@ -7,6 +7,7 @@ import LandingScreen from "./components/LandingScreen";
 import LobbyScreen from "./components/LobbyScreen";
 import SwipeScreen from "./components/SwipeScreen";
 import MatchesScreen from "./components/MatchesScreen";
+import FilmFlameLogo from "./components/FilmFlameLogo";
 import { Sparkles, MessageCircle, Tv, Heart, Users, Award, LogOut } from "lucide-react";
 
 export default function App() {
@@ -19,9 +20,13 @@ export default function App() {
   const [room, setRoom] = useState<Room | null>(null);
   const [swipingStarted, setSwipingStarted] = useState(false);
   const [activeTab, setActiveTab] = useState<"swipe" | "matches">("swipe");
+  const [sharedRoomCode, setSharedRoomCode] = useState<string | null>(null);
 
   // Local state for notifications
   const [notification, setNotification] = useState<string | null>(null);
+
+  // Auto loading batch states
+  const [isAutoLoadingBatch, setIsAutoLoadingBatch] = useState(false);
 
   // 1. Initialize Firebase Anonymous authentication on component mount
   useEffect(() => {
@@ -50,8 +55,10 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     const sharedRoom = params.get("room");
     if (sharedRoom && sharedRoom.length === 4) {
+      const upperCode = sharedRoom.toUpperCase();
+      setSharedRoomCode(upperCode);
       // Prompt notification
-      setNotification(`Gedeelde lobby-uitnodigingscode gevonden: ${sharedRoom}. Vul je naam in om deel te nemen!`);
+      setNotification(`Gedeelde lobby-uitnodigingscode gevonden: ${upperCode}. Vul je naam in om deel te nemen!`);
     }
   }, []);
 
@@ -93,6 +100,78 @@ export default function App() {
       return () => clearTimeout(timer);
     }
   }, [notification]);
+
+  // Automatically load a completely new, fresh batch of movies when both are done and no matches are found
+  useEffect(() => {
+    if (!roomCode || !room || !user || isAutoLoadingBatch) return;
+    
+    // Check if both users have finished swiping
+    const userIds = Object.keys(room.users || {});
+    if (userIds.length < 2) return; // Only trigger when both players are connected
+    
+    const totalMovies = (room.movies || []).length;
+    if (totalMovies === 0) return;
+    
+    const allFinished = userIds.every(uid => {
+      const swipes = room.swipes?.[uid] || {};
+      return Object.keys(swipes).length >= totalMovies;
+    });
+
+    const hasMatches = (room.matches || []).length > 0;
+
+    if (allFinished && !hasMatches) {
+      const fetchNewBatch = async () => {
+        setIsAutoLoadingBatch(true);
+        setLoading(true);
+
+        try {
+          const docPath = `artifacts/flixmatch-default-id/public/data/rooms/${roomCode}`;
+          const roomDocRef = doc(db, "artifacts", "flixmatch-default-id", "public", "data", "rooms", roomCode);
+          const savedKey = localStorage.getItem("flixmatch_tmdb_key") || "";
+
+          const res = await fetch("/api/movies", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              apiKey: savedKey,
+              country: room.country || "NL",
+              providers: room.providers || ["netflix"],
+              vibe: room.vibe || "",
+            }),
+          });
+
+          if (!res.ok) {
+            throw new Error(`Nieuwe batch ophalen mislukt: ${res.statusText}`);
+          }
+
+          const moviesData = await res.json();
+          const movieCollection: Movie[] = moviesData.movies || [];
+
+          if (movieCollection.length > 0) {
+            const cleanSwipes: Record<string, any> = {};
+            userIds.forEach((uid) => {
+              cleanSwipes[uid] = {};
+            });
+
+            await updateDoc(roomDocRef, {
+              movies: movieCollection,
+              swipes: cleanSwipes,
+              matches: [],
+            });
+
+            setNotification("Niemand vond de vorige films leuk... Er is automatisch een gloednieuwe stapel films geladen!");
+          }
+        } catch (err) {
+          console.error("Fout bij het automatisch ophalen van een nieuwe batch:", err);
+        } finally {
+          setIsAutoLoadingBatch(false);
+          setLoading(false);
+        }
+      };
+
+      fetchNewBatch();
+    }
+  }, [room?.swipes, room?.movies, room?.matches, roomCode, user, isAutoLoadingBatch]);
 
   // Generate unique 4 digit code not intersecting known rooms
   const generate4DigitCode = (): string => {
@@ -312,6 +391,58 @@ export default function App() {
     }
   };
 
+  const handleFetchNewBatch = async () => {
+    if (!roomCode || !room) return;
+    setLoading(true);
+    setErrorMsg(null);
+
+    try {
+      const docPath = `artifacts/flixmatch-default-id/public/data/rooms/${roomCode}`;
+      const roomDocRef = doc(db, "artifacts", "flixmatch-default-id", "public", "data", "rooms", roomCode);
+      const savedKey = localStorage.getItem("flixmatch_tmdb_key") || "";
+
+      const res = await fetch("/api/movies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          apiKey: savedKey,
+          country: room.country || "NL",
+          providers: room.providers || ["netflix"],
+          vibe: room.vibe || "",
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Mislukt om nieuwe filmstapel te laden: ${res.statusText}`);
+      }
+
+      const moviesData = await res.json();
+      const movieCollection: Movie[] = moviesData.movies || [];
+
+      if (movieCollection.length > 0) {
+        const cleanSwipes: Record<string, any> = {};
+        Object.keys(room.users || {}).forEach((uid) => {
+          cleanSwipes[uid] = {};
+        });
+
+        await updateDoc(roomDocRef, {
+          movies: movieCollection,
+          swipes: cleanSwipes,
+          matches: [],
+        });
+
+        setNotification("Er is succesvol een gloednieuwe stapel films geladen!");
+      } else {
+        throw new Error("Geen geschikte films gevonden voor de nieuwe instellingen.");
+      }
+    } catch (err: any) {
+      console.error("Fout handmatig ophalen van nieuwe batch:", err);
+      setErrorMsg(err.message || "Er is een fout opgetreden bij het laden van een nieuwe filmstapel.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleLeaveLobby = () => {
     setRoomCode(null);
     setSwipingStarted(false);
@@ -328,11 +459,7 @@ export default function App() {
       {/* Top Main Navigation Header bar */}
       <header className="h-20 px-6 sm:px-8 flex items-center justify-between border-b border-white/5 relative z-20 bg-[#12121d]/85 backdrop-blur-xl sticky top-0">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-[#ff5637] to-[#ba1c00] rounded-xl flex items-center justify-center shadow-lg shadow-red-500/20 select-none">
-            <svg className="w-5.5 h-5.5 text-white" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M21 16.5c0 .38-.21.71-.53.88l-7.9 4.44c-.16.09-.36.14-.57.14s-.41-.05-.57-.14l-7.9-4.44A.991.991 0 0 1 3 16.5V7.5c0-.38.21-.71.53-.88l7.9-4.44c.16-.09.36-.14.57-.14s.41.05.57.14l7.9 4.44c.32.17.53.5.53.88v9z"/>
-            </svg>
-          </div>
+          <FilmFlameLogo size={42} className="hover:scale-110 active:scale-95 transition-transform duration-200 cursor-pointer" />
           <h1 className="text-3xl font-extrabold tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-white via-[#ffb4a5] to-[#ff5637] font-display select-none">
             Filmder
           </h1>
@@ -443,6 +570,7 @@ export default function App() {
           <LandingScreen
             onCreateRoom={handleCreateRoom}
             onJoinRoom={handleJoinRoom}
+            initialJoinCode={sharedRoomCode}
           />
         )}
 
@@ -463,6 +591,7 @@ export default function App() {
               onSwipe={handleSwipeMovie}
               onSendReaction={handleSendReaction}
               onResetDeck={handleResetDeck}
+              onFetchNewBatch={handleFetchNewBatch}
             />
           ) : (
             <MatchesScreen

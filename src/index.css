@@ -29,7 +29,7 @@ body {
 
 .glow-button {
   background: linear-gradient(135deg, #ff5637 0%, #ba1c00 100%);
-  box-shadow: 0 4px 20px rgba(255, 86, 55, 0.4);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 @keyframes float {

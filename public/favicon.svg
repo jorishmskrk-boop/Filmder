@@ -1,0 +1,73 @@
+<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Flame main gradient (Yellow-Orange to deep Fire-Orange) -->
+    <linearGradient id="flameGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#ffb930" />
+      <stop offset="35%" stopColor="#ff7c23" />
+      <stop offset="100%" stopColor="#ff3d00" />
+    </linearGradient>
+
+    <!-- Play-button solid gradient -->
+    <linearGradient id="playGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stopColor="#ff8512" />
+      <stop offset="100%" stopColor="#ff4500" />
+    </linearGradient>
+
+    <!-- Mask to punch out the center flame and the film strip holes -->
+    <mask id="flameMask">
+      <!-- Keep everything inside the white base -->
+      <rect x="-10" y="-10" width="120" height="120" fill="white" />
+
+      <!-- Cut out the inner flame space with black -->
+      <path
+        d="M 50 36 
+           C 42 46, 35 55, 35 68 
+           C 35 77, 41 83, 50 83 
+           C 59 83, 65 77, 65 68 
+           C 65 55, 58 46, 50 36 Z"
+        fill="black"
+      />
+
+      <!-- Cut out left edge film strip holes -->
+      <rect x="23" y="78" width="4" height="4" rx="1" fill="black" transform="rotate(-15, 25, 80)" />
+      <rect x="19.5" y="71" width="4" height="4" rx="1" fill="black" transform="rotate(-23, 21.5, 73)" />
+      <rect x="17.5" y="63" width="4" height="4" rx="1" fill="black" transform="rotate(-30, 19.5, 65)" />
+      <rect x="18" y="55" width="4" height="4" rx="1" fill="black" transform="rotate(-38, 20, 57)" />
+      <rect x="21" y="47" width="4" height="4" rx="1" fill="black" transform="rotate(-45, 23, 49)" />
+      <rect x="26.5" y="40" width="4" height="4" rx="1" fill="black" transform="rotate(-52, 28.5, 42)" />
+      <rect x="34.5" y="35" width="4" height="4" rx="1" fill="black" transform="rotate(-62, 36.5, 37)" />
+
+      <!-- Cut out right edge film strip holes -->
+      <rect x="73" y="78" width="4" height="4" rx="1" fill="black" transform="rotate(15, 75, 80)" />
+      <rect x="76.5" y="71" width="4" height="4" rx="1" fill="black" transform="rotate(23, 78.5, 73)" />
+      <rect x="78.5" y="63" width="4" height="4" rx="1" fill="black" transform="rotate(30, 80.5, 65)" />
+      <rect x="78" y="55" width="4" height="4" rx="1" fill="black" transform="rotate(38, 80, 57)" />
+      <rect x="75" y="47" width="4" height="4" rx="1" fill="black" transform="rotate(45, 77, 49)" />
+      <rect x="69.5" y="40" width="4" height="4" rx="1" fill="black" transform="rotate(52, 71.5, 42)" />
+      <rect x="61.5" y="35" width="4" height="4" rx="1" fill="black" transform="rotate(62, 63.5, 37)" />
+    </mask>
+  </defs>
+
+  <!-- Main Flame body (Masked for the holes and center hole) -->
+  <path
+    d="M 52 4 
+       C 54 13, 50 18, 47 21 
+       C 40 28, 32 35, 30 42 
+       C 25 40, 21.5 44, 19.5 49 
+       C 16.5 56.5, 12.5 63, 12.5 73 
+       C 12.5 91, 29.5 96, 50 96 
+       C 70.5 96, 87.5 91, 87.5 73 
+       C 87.5 63, 83.5 56.5, 80.5 49 
+       C 78.5 44, 75 40, 70 42 
+       C 68 35, 60 28, 53 21 
+       C 60.5 17, 60.5 12, 52 4 Z"
+    fill="url(#flameGrad)"
+    mask="url(#flameMask)"
+  />
+
+  <!-- Play Icon in the hollow center of the flame -->
+  <polygon
+    points="46,55 46,73 61,64"
+    fill="url(#playGrad)"
+  />
+</svg>
