@@ -1,20 +1,20 @@
 <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <!-- Flame main gradient (Yellow-Orange to deep Fire-Orange) -->
-    <linearGradient id="flameGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stopColor="#ffb930" />
-      <stop offset="35%" stopColor="#ff7c23" />
-      <stop offset="100%" stopColor="#ff3d00" />
+    <linearGradient id="favFlameGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffb930" />
+      <stop offset="35%" stop-color="#ff7c23" />
+      <stop offset="100%" stop-color="#ff3d00" />
     </linearGradient>
 
     <!-- Play-button solid gradient -->
-    <linearGradient id="playGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stopColor="#ff8512" />
-      <stop offset="100%" stopColor="#ff4500" />
+    <linearGradient id="favPlayGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ff8512" />
+      <stop offset="100%" stop-color="#ff4500" />
     </linearGradient>
 
     <!-- Mask to punch out the center flame and the film strip holes -->
-    <mask id="flameMask">
+    <mask id="favFlameMask">
       <!-- Keep everything inside the white base -->
       <rect x="-10" y="-10" width="120" height="120" fill="white" />
 
@@ -48,6 +48,9 @@
     </mask>
   </defs>
 
+  <!-- Background circle so the icon remains colored and visible in all tabs -->
+  <circle cx="50" cy="50" r="46" fill="#12121d" stroke="#ff5637" stroke-width="2.5" />
+
   <!-- Main Flame body (Masked for the holes and center hole) -->
   <path
     d="M 52 4 
@@ -61,13 +64,15 @@
        C 78.5 44, 75 40, 70 42 
        C 68 35, 60 28, 53 21 
        C 60.5 17, 60.5 12, 52 4 Z"
-    fill="url(#flameGrad)"
-    mask="url(#flameMask)"
+    fill="url(#favFlameGrad)"
+    mask="url(#favFlameMask)"
+    transform="translate(7.5, 7.5) scale(0.85)"
   />
 
   <!-- Play Icon in the hollow center of the flame -->
   <polygon
     points="46,55 46,73 61,64"
-    fill="url(#playGrad)"
+    fill="url(#favPlayGrad)"
+    transform="translate(7.5, 7.5) scale(0.85)"
   />
 </svg>

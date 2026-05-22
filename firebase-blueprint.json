@@ -54,6 +54,10 @@
         "reactions": {
           "type": "object",
           "description": "Mapping from user UID to their active reaction"
+        },
+        "superLikes": {
+          "type": "object",
+          "description": "Mapping from user UID to movie ID booleans for extra hearts / super likes"
         }
       },
       "required": ["id", "createdAt", "country", "providers", "vibe"]

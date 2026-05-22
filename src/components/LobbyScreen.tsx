@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Copy, Users, Play, ArrowLeft, CheckCircle, Sparkles } from "lucide-react";
+import { Copy, Users, Play, ArrowLeft, CheckCircle, Sparkles, User } from "lucide-react";
 import { Room } from "../types";
 import { useLanguage } from "../LanguageContext";
 
@@ -89,8 +89,8 @@ export default function LobbyScreen({ room, currentUserId, onStartSwiping, onLea
                 >
                   <div className="flex items-center gap-2.5">
                     <div className="relative">
-                      <div className="w-8 h-8 rounded-full bg-slate-900 border border-white/10 flex items-center justify-center text-xs font-bold font-display uppercase text-[#ffb4a5]">
-                        {username.slice(0, 2)}
+                      <div className="w-8 h-8 rounded-full bg-slate-900 border border-white/10 flex items-center justify-center text-[#ffb4a5]">
+                        <User className="w-4 h-4 animate-fade-in" />
                       </div>
                       <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-[#ffdb3c] rounded-full border-2 border-[#12121d]" />
                     </div>

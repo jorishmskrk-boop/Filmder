@@ -9,7 +9,8 @@ import LobbyScreen from "./components/LobbyScreen";
 import SwipeScreen from "./components/SwipeScreen";
 import MatchesScreen from "./components/MatchesScreen";
 import FilmFlameLogo from "./components/FilmFlameLogo";
-import { LogOut } from "lucide-react";
+import { LogOut, User as UserIcon } from "lucide-react";
+import { GENRES } from "./constants";
 import toast, { Toaster } from "react-hot-toast";
 import { useLanguage } from "./LanguageContext";
 
@@ -321,16 +322,19 @@ export default function App() {
         handleFirestoreError(err, OperationType.WRITE, docPath);
       }
 
-      // If liked (true), check if partner also swiped true (on the same movie)
+      // If liked (true), check if all users in the room have liked it
       if (liked) {
-        const usersList = Object.keys(room.users || {});
-        const partnerId = usersList.find((uid) => uid !== user.uid);
+        const userIds = Object.keys(room.users || {});
+        if (userIds.length >= 2) {
+          const allOthersLiked = userIds
+            .filter((uid) => uid !== user.uid)
+            .every((uid) => {
+              const userSwipes = room.swipes?.[uid] || {};
+              return userSwipes[movieId] === true;
+            });
 
-        if (partnerId) {
-          const partnerSwipes = room.swipes?.[partnerId] || {};
-          if (partnerSwipes[movieId] === true) {
+          if (allOthersLiked) {
             // Ensure we do not add duplicate matches
-            // Support checking against either structured Movie objects or raw ID strings
             const alreadyMatched = (room.matches || []).some((m) => {
               const matchedId = typeof m === "string" ? m : m.id;
               return matchedId === movieId;
@@ -338,7 +342,6 @@ export default function App() {
 
             if (!alreadyMatched) {
               try {
-                // Write EXCLUSIVELY the movieId string instead of full object for DB optimization
                 await updateDoc(roomDocRef, {
                   matches: arrayUnion(movieId),
                 });
@@ -352,6 +355,61 @@ export default function App() {
       }
     } catch (err) {
       console.error("Error registering card swipe:", err);
+    }
+  };
+
+  const handleToggleSuperLike = async (movieId: string) => {
+    if (!user || !roomCode || !room) return;
+
+    const docPath = `artifacts/flixmatch-default-id/public/data/rooms/${roomCode}`;
+    const roomDocRef = getRoomRef(roomCode);
+
+    const alreadySuperLiked = room.superLikes?.[user.uid]?.[movieId] === true;
+
+    try {
+      if (alreadySuperLiked) {
+        await updateDoc(roomDocRef, {
+          [`superLikes.${user.uid}.${movieId}`]: false,
+        });
+        toast.success(language === "nl" ? "Extra hartje verwijderd!" : "Extra heart removed!");
+      } else {
+        await updateDoc(roomDocRef, {
+          [`superLikes.${user.uid}.${movieId}`]: true,
+        });
+        toast.success(language === "nl" ? "Extra hartje toegevoegd! 💖" : "Extra heart added! 💖");
+      }
+    } catch (err: any) {
+      console.error("Error registering extra heart:", err);
+      handleFirestoreError(err, OperationType.WRITE, docPath);
+    }
+  };
+
+  const handleRemoveMatch = async (movieId: string) => {
+    if (!user || !roomCode || !room) return;
+
+    const docPath = `artifacts/flixmatch-default-id/public/data/rooms/${roomCode}`;
+    const roomDocRef = getRoomRef(roomCode);
+
+    try {
+      if (isSolo) {
+        // Solo mode: remove from favorites by setting swipe to false
+        await updateDoc(roomDocRef, {
+          [`swipes.${user.uid}.${movieId}`]: false,
+        });
+        toast.success(language === "nl" ? "Film verwijderd uit favorieten." : "Movie removed from favorites.");
+      } else {
+        // Multi-user mode: remove from matches array in Firestore
+        const currentRawMatches = (room.matches || []).map(m => typeof m === "string" ? m : m.id);
+        const updatedMatches = currentRawMatches.filter(id => id !== movieId);
+        
+        await updateDoc(roomDocRef, {
+          matches: updatedMatches,
+        });
+        toast.success(language === "nl" ? "Film verwijderd uit matches voor iedereen." : "Movie removed from matches for everyone.");
+      }
+    } catch (err: any) {
+      console.error("Error removing match:", err);
+      handleFirestoreError(err, OperationType.WRITE, docPath);
     }
   };
 
@@ -470,6 +528,38 @@ export default function App() {
     toast(t("leave_lobby_confirm"));
   };
 
+  const isSolo = room ? Object.keys(room.users || {}).length < 2 : false;
+  const displayMatches = room && user
+    ? (isSolo
+        ? (room.movies || []).filter((m) => room.swipes?.[user.uid]?.[m.id] === true)
+        : (room.matches || []))
+    : [];
+
+  // Auto-navigate to matches tab when current user has swiped all movies and there is at least one match
+  useEffect(() => {
+    if (room && user && swipingStarted && activeTab === "swipe") {
+      const mySwipes = room.swipes?.[user.uid] || {};
+      const unswiped = (room.movies || []).filter((m) => mySwipes[m.id] === undefined);
+      if (unswiped.length === 0 && displayMatches.length > 0) {
+        setActiveTab("matches");
+        toast.success(language === "nl" ? "Alle films geswiped! Je matches staan klaar." : "All movies swiped! Let's check your matches.");
+      }
+    }
+  }, [room?.swipes, room?.movies, room?.matches, swipingStarted, activeTab, displayMatches.length, setActiveTab, user, room, language]);
+
+  // Map comma-separated genre IDs to human-readable names
+  const getSfeerDisplay = () => {
+    if (!room || !room.vibe) return t("sfeer_selectie");
+    const ids = room.vibe.split(",");
+    const names = ids
+      .map((id) => {
+        const genre = GENRES.find((g) => g.id === id.trim());
+        return genre ? genre.name : id;
+      })
+      .filter(Boolean);
+    return names.length > 0 ? names.join(", ") : room.vibe;
+  };
+
   return (
     <div className="min-h-screen bg-[#12121d] text-[#e3e0f1] font-sans flex flex-col justify-between relative overflow-hidden bg-gradient-mesh">
       {/* Global Toast Elements Configuration Container */}
@@ -521,12 +611,12 @@ export default function App() {
                   return (
                     <div
                       key={uid}
-                      className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full border-2 border-[#12121d] flex items-center justify-center text-[10px] sm:text-xs font-black shadow-lg uppercase font-display select-none transition-transform hover:scale-115 shrink-0 ${
+                      className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full border-2 border-[#12121d] flex items-center justify-center shadow-lg uppercase font-display select-none transition-transform hover:scale-115 shrink-0 ${
                         isMe ? "bg-gradient-to-br from-[#ff5637] to-[#ba1c00] text-white" : "bg-slate-800 text-[#e3e0f1]"
                       }`}
                       title={displayName}
                     >
-                      {displayName.slice(0, 2)}
+                      <UserIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
                     </div>
                   );
                 })}
@@ -555,11 +645,6 @@ export default function App() {
                     }`}
                   >
                     {t("tab_matches")}
-                    {(room.matches || []).length > 0 && (
-                      <span className="absolute -top-1 -right-1 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-[#ff5637] px-1 text-[7px] font-black text-white border-2 border-[#12121d] animate-pulse shadow-md">
-                        {(room.matches || []).length}
-                      </span>
-                    )}
                   </button>
                 </div>
               )}
@@ -659,8 +744,13 @@ export default function App() {
             />
           ) : (
             <MatchesScreen
-              matches={room.matches || []}
+              matches={displayMatches}
+              room={room}
+              currentUserId={user?.uid || ""}
               onBackToSwipes={() => setActiveTab("swipe")}
+              isSolo={isSolo}
+              onRemoveMatch={handleRemoveMatch}
+              onToggleSuperLike={handleToggleSuperLike}
             />
           )
         )}
@@ -674,7 +764,7 @@ export default function App() {
             {t("regio")}: {room ? room.country : "NL"}
           </span>
           <span className="text-slate-800">|</span>
-          <span className="text-slate-300">{t("sfeer")}: {room ? (room.vibe ? room.vibe.toUpperCase() : t("sfeer_selectie")) : t("sfeer_selectie")}</span>
+          <span className="text-slate-300">{t("sfeer")}: {getSfeerDisplay()}</span>
         </div>
         <div className="text-[10px] text-slate-400 font-sans hidden sm:block font-extrabold tracking-wide">
           {room ? `${t("groepscode_footer")} ${room.id}` : t("samen_kiezen_footer")}

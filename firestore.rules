@@ -35,7 +35,8 @@ service cloud.firestore {
         && (data.users is map)
         && (data.swipes is map)
         && (data.matches is list && data.matches.size() <= 50)
-        && (data.reactions is map);
+        && (data.reactions is map)
+        && (data.get('superLikes', null) == null || data.superLikes is map);
     }
 
     // Custom Matcher Room path
@@ -55,18 +56,21 @@ service cloud.firestore {
         && isValidRoomCode(roomCode)
         && isValidRoom(request.resource.data)
         && (
-          // Allow joining: user adds theirUID to the users map
+          // Allow joining
           (request.resource.data.users.keys().hasAll(resource.data.users.keys())
-          && request.resource.data.users.keys().size() <= 2)
+          && request.resource.data.users.keys().size() <= 3)
           ||
-          // Allow swiping: user modifies their swipes section in swipes map
-          (request.resource.data.swipes.keys().size() <= 2)
+          // Allow swiping
+          (request.resource.data.swipes.keys().size() <= 3)
           ||
-          // Allow reactions: user edits their reaction inside reactions map
-          (request.resource.data.reactions.keys().size() <= 2)
+          // Allow reactions
+          (request.resource.data.reactions.keys().size() <= 3)
           ||
-          // Allow matches additions
-          (request.resource.data.matches.size() >= resource.data.matches.size())
+          // Allow matches additions/deletions
+          (request.resource.data.matches.size() <= 50)
+          ||
+          // Allow superLikes
+          (request.resource.data.get('superLikes', null) == null || request.resource.data.superLikes.keys().size() <= 3)
         );
 
       allow delete: if false; // Rooms are never deleted via client

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, SVGProps, memo } from "react";
 import { motion, AnimatePresence, useMotionValue, useTransform } from "motion/react";
-import { Heart, X, Sparkles, AlertCircle, Star, RefreshCw, Play } from "lucide-react";
+import { Heart, X, Sparkles, AlertCircle, Star, RefreshCw, Play, User } from "lucide-react";
 import { Movie, Room } from "../types";
 import Confetti from "./Confetti";
 import ProviderLogo from "./ProviderLogo";
@@ -42,6 +42,12 @@ export default function SwipeScreen({
   // Filter unswiped movies
   const mySwipes = room.swipes?.[currentUserId] || {};
   const unswipedMovies = (room.movies || []).filter(m => mySwipes[m.id] === undefined);
+
+  // If solo, we list all the user's swiped/liked movies
+  const isSolo = !partnerId;
+  const displayMatches = isSolo
+    ? (room.movies || []).filter(m => mySwipes[m.id] === true)
+    : (room.matches || []);
 
   // Reaction display state
   const [partnerReaction, setPartnerReaction] = useState<{ label: string; text: string } | null>(null);
@@ -282,8 +288,8 @@ export default function SwipeScreen({
             </h3>
             <div className="flex items-center gap-3">
               <div className="relative">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#ff5637] to-[#ba1c00] flex items-center justify-center text-white font-black select-none uppercase font-display border border-white/10">
-                  {partnerId ? partnerName.slice(0, 2).toUpperCase() : "SL"}
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#ff5637] to-[#ba1c00] flex items-center justify-center text-white select-none border border-white/10">
+                  <User className="w-5 h-5 text-white" />
                 </div>
                 <div className={`absolute -bottom-1 -right-1 w-5 h-5 border-2 border-[#12121d] rounded-full ${partnerId ? "bg-[#ffdb3c]" : "bg-neutral-800"}`}></div>
               </div>
@@ -304,75 +310,7 @@ export default function SwipeScreen({
             </div>
           </div>
 
-          {/* Match Progress overview list */}
-          <div className="glass-card rounded-3xl p-6 flex-1 flex flex-col justify-between border border-white/5 min-h-[180px]">
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                  {language === "nl" ? "Recente Matches" : "Recent Matches"}
-                </h3>
-                <span className="text-xs font-extrabold bg-[#ff5637]/10 text-[#ffb4a5] px-2.5 py-0.5 rounded-full border border-[#ff5637]/25 select-none font-sans">
-                  {room.matches?.length || 0} Matches
-                </span>
-              </div>
-              
-              <div className="space-y-4 max-h-[170px] overflow-y-auto custom-scrollbar pr-1">
-                {room.matches && room.matches.length > 0 ? (
-                  room.matches.slice(-3).reverse().map((matchItem) => (
-                    <div key={matchItem.id} className="flex gap-3 group animate-all duration-300 items-center justify-between">
-                      <div className="flex gap-3 items-center min-w-0">
-                        <div className="relative shrink-0 select-none">
-                          <div
-                            className="w-10 h-14 rounded-lg bg-cover bg-center border border-white/5"
-                            style={{ backgroundImage: `url('${matchItem.backdrop}')` }}
-                          />
-                          {/* Rich integration: Show active provider logos overlaid on match items */}
-                          <div className="absolute -bottom-1 -right-1 flex gap-0.5 bg-[#12121d]/90 backdrop-blur-xs p-0.5 rounded-md border border-white/10 scale-85">
-                            {matchItem.providers?.slice(0, 2).map((prov) => (
-                              <div key={prov} className="w-4.5 h-3 overflow-hidden rounded-xs shrink-0 select-none shadow">
-                                <ProviderLogo id={prov} active={true} size={8} />
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="flex flex-col justify-center min-w-0 font-sans">
-                          <p className="text-sm font-bold text-white group-hover:text-[#ff5637] leading-tight line-clamp-1 transition-colors font-display">
-                            {matchItem.title}
-                          </p>
-                          <p className="text-[11px] text-slate-300 mt-0.5 gap-1.5 flex items-center">
-                            <span>{matchItem.year}</span>
-                            <span className="inline-flex items-center gap-0.5 text-[#ffdb3c] font-bold">★ {matchItem.rating}</span>
-                          </p>
-                          <div className="flex gap-1 mt-1">
-                            <span className="w-2.5 h-2.5 rounded-full bg-[#ff5637] animate-pulse" title={language === "nl" ? "Jij vond dit leuk" : "You liked this"} />
-                            <span className="w-2.5 h-2.5 rounded-full bg-[#ffe16d]" title={language === "nl" ? "Je partner vond dit leuk" : "Your partner liked this"} />
-                          </div>
-                        </div>
-                      </div>
-                      {matchItem.trailerUrl && (
-                        <a
-                          href={matchItem.trailerUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="p-2 bg-[#ff5637]/10 hover:bg-gradient-to-br hover:from-[#ff5637] hover:to-[#ba1c00] text-[#ffb4a5] hover:text-white rounded-xl transition-all border border-white/5 shrink-0 shadow-sm hover:scale-105 cursor-pointer focus-visible:ring-2 focus-visible:ring-red-500 focus:outline-none"
-                          title={language === "nl" ? "Bekijk filmtrailer op YouTube" : "Watch trailer on YouTube"}
-                          aria-label={`Bekijk trailer van ${matchItem.title}`}
-                        >
-                          <Play className="w-3.5 h-3.5 fill-current" />
-                        </a>
-                      )}
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-xs text-slate-400 italic py-5 text-center leading-relaxed">
-                    {language === "nl" 
-                      ? "Nog geen gezamenlijke matches. Liket allebei een film om matches te genereren!" 
-                      : "No mutual matches yet. Both players must like a movie to trigger a match!"}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
+
 
           {/* Reactions Tray without raw emojis */}
           <div className="space-y-3 glass-card rounded-3xl p-4 border border-white/5">

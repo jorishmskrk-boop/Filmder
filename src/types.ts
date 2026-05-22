@@ -22,6 +22,7 @@ export interface Room {
   swipes: Record<string, Record<string, boolean>>; // Maps uid -> movie_id -> boolean (liked)
   matches: Movie[];
   reactions: Record<string, { emoji: string; timestamp: number }>; // Maps uid -> reaction details
+  superLikes?: Record<string, Record<string, boolean>>; // Maps uid -> movie_id -> boolean (super liked)
   maxRuntime?: number;
   minRuntime?: number;
   minRating?: number;
