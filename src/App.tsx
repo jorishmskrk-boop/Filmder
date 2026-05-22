@@ -504,7 +504,6 @@ export default function App() {
         await updateDoc(roomDocRef, {
           movies: movieCollection,
           swipes: cleanSwipes,
-          matches: [],
         });
 
         toast.success(language === "nl" ? "Er is een gloednieuwe stapel films geladen!" : "A brand new deck of movies has been loaded!");
@@ -535,17 +534,7 @@ export default function App() {
         : (room.matches || []))
     : [];
 
-  // Auto-navigate to matches tab when current user has swiped all movies and there is at least one match
-  useEffect(() => {
-    if (room && user && swipingStarted && activeTab === "swipe") {
-      const mySwipes = room.swipes?.[user.uid] || {};
-      const unswiped = (room.movies || []).filter((m) => mySwipes[m.id] === undefined);
-      if (unswiped.length === 0 && displayMatches.length > 0) {
-        setActiveTab("matches");
-        toast.success(language === "nl" ? "Alle films geswiped! Je matches staan klaar." : "All movies swiped! Let's check your matches.");
-      }
-    }
-  }, [room?.swipes, room?.movies, room?.matches, swipingStarted, activeTab, displayMatches.length, setActiveTab, user, room, language]);
+  // Removed single-player premature auto-navigate to matches tab so players stay in swipe screen until both finish and celebrate matches together
 
   // Map comma-separated genre IDs to human-readable names
   const getSfeerDisplay = () => {
@@ -741,6 +730,7 @@ export default function App() {
               onSendReaction={handleSendReaction}
               onResetDeck={handleResetDeck}
               onFetchNewBatch={handleFetchNewBatch}
+              onGoToMatches={() => setActiveTab("matches")}
             />
           ) : (
             <MatchesScreen

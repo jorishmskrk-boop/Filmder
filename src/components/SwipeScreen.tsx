@@ -13,6 +13,7 @@ interface SwipeScreenProps {
   onSendReaction: (emoji: string) => void;
   onResetDeck: () => void;
   onFetchNewBatch: () => void;
+  onGoToMatches?: () => void;
 }
 
 const REACTION_MAP: Record<string, { label: string; labelEn: string; color: string }> = {
@@ -30,6 +31,7 @@ export default function SwipeScreen({
   onSendReaction,
   onResetDeck,
   onFetchNewBatch,
+  onGoToMatches,
 }: SwipeScreenProps) {
   const { language, t } = useLanguage();
 
@@ -40,8 +42,13 @@ export default function SwipeScreen({
   const partnerName = partnerEntry?.[1] || "Partner";
 
   // Filter unswiped movies
+  const currentMovies = room.movies || [];
   const mySwipes = room.swipes?.[currentUserId] || {};
-  const unswipedMovies = (room.movies || []).filter(m => mySwipes[m.id] === undefined);
+  const unswipedMovies = currentMovies.filter(m => mySwipes[m.id] === undefined);
+
+  // Check if partner is finished with the current stack of movies
+  const partnerSwipes = partnerId ? (room.swipes?.[partnerId] || {}) : {};
+  const partnerFinished = !partnerId || (currentMovies.length > 0 && currentMovies.every(m => partnerSwipes[m.id] !== undefined));
 
   // If solo, we list all the user's swiped/liked movies
   const isSolo = !partnerId;
@@ -91,29 +98,68 @@ export default function SwipeScreen({
     }
   }, [room.reactions, partnerId, partnerName, language]);
 
-  // Monitor matched movies list to trigger full screen celebration only when both players are finished
-  const hasCelebrated = useRef(false);
+  // Keep track of which movie matches we have already shown celebrations for in this session
+  const celebratedMovieIds = useRef<Set<string>>(new Set());
+  const isCelebratedInitialized = useRef(false);
+  const hasCelebratedFinishedDeck = useRef<string | null>(null);
+
+  // Monitor matched movies list and finish state to trigger full screen celebration only when both players are finished swiping
   useEffect(() => {
     const currentMatches = room.matches || [];
-    const totalMovies = (room.movies || []).length;
-    if (totalMovies === 0) return;
 
-    const users = Object.keys(room.users || {});
-    const allPlayersFinished = users.every(uid => {
+    // First time we get a valid room object with matches, we mark all past matches as celebrated
+    if (!isCelebratedInitialized.current && room.matches) {
+      currentMatches.forEach(m => {
+        celebratedMovieIds.current.add(m.id);
+      });
+      isCelebratedInitialized.current = true;
+      return;
+    }
+
+    const currentMovies = room.movies || [];
+    if (currentMovies.length === 0) return;
+
+    const userIds = Object.keys(room.users || {});
+    if (userIds.length < 2) return; // Wait for partner to be connected/present
+
+    // Check if both players are finished swiping the current stack of movies
+    const allFinished = userIds.every(uid => {
       const swipes = room.swipes?.[uid] || {};
-      return Object.keys(swipes).length >= totalMovies;
+      return currentMovies.every(m => swipes[m.id] !== undefined);
     });
 
-    if (allPlayersFinished && currentMatches.length > 0) {
-      if (!hasCelebrated.current) {
-        const newestMatch = currentMatches[currentMatches.length - 1];
-        setCelebrationMatch(newestMatch);
-        hasCelebrated.current = true;
+    if (allFinished && currentMatches.length > 0) {
+      // Create a unique fingerprint key representing this stack's movies
+      const stackFingerprint = currentMovies.map(m => m.id).join(",");
+      
+      if (hasCelebratedFinishedDeck.current !== stackFingerprint) {
+        // Find the first match that has not been celebrated in this session yet
+        const uncelebratedMatch = currentMatches.find(m => !celebratedMovieIds.current.has(m.id));
+
+        if (uncelebratedMatch) {
+          setCelebrationMatch(uncelebratedMatch);
+          celebratedMovieIds.current.add(uncelebratedMatch.id);
+        } else {
+          // If all matches were somehow celebrated, show the newest match of this deck
+          setCelebrationMatch(currentMatches[currentMatches.length - 1]);
+        }
+        hasCelebratedFinishedDeck.current = stackFingerprint;
       }
-    } else {
-      hasCelebrated.current = false;
     }
-  }, [room.matches, room.users, room.swipes, room.movies]);
+  }, [room.movies, room.swipes, room.matches, room.users]);
+
+  // Handle auto close celebration modal and automatically go to matches tab after 6.5s
+  useEffect(() => {
+    if (celebrationMatch) {
+      const timer = setTimeout(() => {
+        setCelebrationMatch(null);
+        if (onGoToMatches) {
+          onGoToMatches();
+        }
+      }, 6500); // 6.5 seconds of confetti, then transit to matches page automatically
+      return () => clearTimeout(timer);
+    }
+  }, [celebrationMatch, onGoToMatches]);
 
   // Unified controller to handle swipes safety with action-locks
   const triggerButtonSwipe = (liked: boolean) => {
@@ -196,12 +242,28 @@ export default function SwipeScreen({
                   </div>
                   <div className="space-y-1">
                     <h4 className="font-bold text-[#e3e0f1] font-display">
-                      {language === "nl" ? "Einde van de filmstapel!" : "End of the movie stack!"}
+                      {!partnerId ? (
+                        language === "nl" ? "Einde van de filmstapel!" : "End of the movie stack!"
+                      ) : !partnerFinished ? (
+                        language === "nl" ? "Wachten op je partner..." : "Waiting for your partner..."
+                      ) : (
+                        language === "nl" ? "Klaar met deze stapel!" : "Finished with this stack!"
+                      )}
                     </h4>
                     <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
-                      {language === "nl" 
-                        ? "Er zijn geen films meer beschikbaar binnen je geselecteerde criteria en streamingdiensten. Pas de lobby-instellingen aan of herlaad de stapel!"
-                        : "There are no more movies available within your active filters and services. Adjust room filters or reload the stack!"}
+                      {!partnerId ? (
+                        language === "nl" 
+                          ? "Er zijn geen films meer beschikbaar binnen je geselecteerde criteria. Pas de lobby-instellingen aan of herlaad de stapel!"
+                          : "There are no more movies available with your active filters. Adjust room settings or reload the stack!"
+                      ) : !partnerFinished ? (
+                        language === "nl"
+                          ? `Je hebt alle films in deze stapel geswiped! We wachten nu tot ${partnerName} ook klaar is.`
+                          : `You've swiped all movies in this stack! Now waiting for ${partnerName} to finish too.`
+                      ) : (
+                        language === "nl"
+                          ? "Jullie hebben allebei deze stapel doorgebladerd! Klik op 'Gloednieuwe stapel ophalen' voor de volgende ronde."
+                          : "You have both finished checking this stack! Click 'Get a brand new stack' for the next round."
+                      )}
                     </p>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-3">
@@ -372,9 +434,17 @@ export default function SwipeScreen({
                 <h3 className="text-2xl font-black font-display tracking-tight text-[#e3e0f1] px-2">
                   {celebrationMatch.title}
                 </h3>
-                <p className="text-[#ffe16d] text-xs font-sans font-extrabold flex items-center justify-center gap-1.5 mt-1 select-none">
+                <p className="text-[#ffe16d] text-xs font-sans font-extrabold flex items-center justify-center gap-2 mt-1 select-none">
                   <span>{language === "nl" ? `Uitgebracht in ${celebrationMatch.year}` : `Released in ${celebrationMatch.year}`}</span>
-                  <span className="text-[#ffdb3c]">★ {celebrationMatch.rating}</span>
+                  <span className="text-[#ffdb3c] flex items-center gap-1 bg-black/50 px-2 py-0.5 rounded-full border border-white/5">
+                    <Star className="w-3 h-3 text-[#ffdb3c] fill-[#ffdb3c] shrink-0" />
+                    <span className="text-white">{celebrationMatch.rating}</span>
+                    {celebrationMatch.ratingSource === "IMDb" ? (
+                      <span className="bg-[#f5c518] text-black text-[8px] font-black px-1.5 py-0.2 rounded font-sans uppercase tracking-wide">IMDb</span>
+                    ) : (
+                      <span className="bg-[#01b4e4] text-white text-[8px] font-black px-1.5 py-0.2 rounded font-sans uppercase tracking-wide">TMDB</span>
+                    )}
+                  </span>
                 </p>
               </div>
 
@@ -412,14 +482,19 @@ export default function SwipeScreen({
                     {language === "nl" ? "Bekijk Trailer" : "Watch Trailer"}
                   </a>
                 )}
-                <button
+                 <button
                   id="close-match-celebration-btn"
                   type="button"
-                  onClick={() => setCelebrationMatch(null)}
+                  onClick={() => {
+                    setCelebrationMatch(null);
+                    if (onGoToMatches) {
+                      onGoToMatches();
+                    }
+                  }}
                   className="w-full py-3 px-4 rounded-full glow-button text-white font-extrabold tracking-wide shadow-md active:scale-95 transition-all cursor-pointer text-xs uppercase tracking-widest focus-visible:ring-2 focus-visible:ring-[#ff5637] focus:outline-none"
-                  aria-label="Sluit viering en ga door met swipen"
+                  aria-label="Sluit viering en ga door naar matches"
                 >
-                  {language === "nl" ? "Verder Swipen!" : "Keep Swiping!"}
+                  {language === "nl" ? "Bekijk onze matches! 🍿" : "View our matches! 🍿"}
                 </button>
               </div>
             </motion.div>
@@ -544,9 +619,14 @@ const CinephileCard = memo(function CinephileCard({
                 Trailer
               </a>
             )}
-            <div className="flex items-center gap-1 bg-black/60 backdrop-blur-md border border-white/5 px-2 py-1 rounded-full">
-              <Star className="w-3 h-3 text-[#ffdb3c] fill-[#ffdb3c] shrink-0" />
-              <span className="text-[11px] font-bold text-[#ffdb3c]">{movie.rating}</span>
+            <div className="flex items-center gap-1.5 bg-black/75 backdrop-blur-md border border-white/10 px-2.5 py-1 rounded-full text-[11.5px] font-extrabold">
+              <Star className="w-3.5 h-3.5 text-[#ffdb3c] fill-[#ffdb3c] shrink-0" />
+              <span className="text-white">{movie.rating}</span>
+              {movie.ratingSource === "IMDb" ? (
+                <span className="bg-[#f5c518] text-black text-[9px] font-black px-1.5 py-0.5 rounded-[4px] tracking-wide ml-0.5" title="IMDb Score">IMDb</span>
+              ) : (
+                <span className="bg-[#01b4e4] text-white text-[9px] font-black px-1.5 py-0.5 rounded-[4px] tracking-wide ml-0.5" title="TMDB Score">TMDB</span>
+              )}
             </div>
           </div>
         </div>

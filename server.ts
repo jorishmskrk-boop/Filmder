@@ -131,6 +131,53 @@ async function getTrailerUrlForMovie(movieId: string, tmdbKey: string): Promise<
   return undefined;
 }
 
+// Helper function to query TMDB for IMDb ID
+async function getImdbIdForMovie(movieId: string, tmdbKey: string): Promise<string | undefined> {
+  try {
+    const res = await fetch(`https://api.themoviedb.org/3/movie/${movieId}/external_ids?api_key=${tmdbKey}`);
+    if (!res.ok) return undefined;
+    const data = await res.json() as { imdb_id?: string };
+    return data.imdb_id || undefined;
+  } catch (err) {
+    console.error(`Error querying external IDs for movie ${movieId}:`, err);
+  }
+  return undefined;
+}
+
+// Helper function to fetch IMDb rating from OMDb API with automatic limits fallback to TMDB
+async function getOmdbRating(imdbId: string | undefined): Promise<{ rating: number; source: string } | undefined> {
+  const omdbKey = process.env.OMDB_API_KEY;
+  if (!imdbId || !omdbKey || !omdbKey.trim()) return undefined;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout to give network operations a fair chance
+    const res = await fetch(`https://www.omdbapi.com/?i=${imdbId}&apikey=${omdbKey.trim()}`, {
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (res.ok) {
+      const data = await res.json() as { Response?: string; imdbRating?: string; Error?: string };
+      if (data.Response === "True" && data.imdbRating && data.imdbRating !== "N/A") {
+        const parsedRating = parseFloat(data.imdbRating);
+        if (!isNaN(parsedRating) && parsedRating > 0) {
+          return { rating: parsedRating, source: "IMDb" };
+        }
+      } else if (data.Response === "False") {
+        console.warn(`OMDb lookup failed or limit hit (1000/day reached) for ${imdbId}: ${data.Error}`);
+      }
+    }
+  } catch (err: any) {
+    if (err?.name === "AbortError" || err?.name === "TimeoutError" || err?.code === "ABORT_ERR") {
+      // Aborted or timed out operations are expected fallback paths; silent exit
+      return undefined;
+    }
+    console.error(`Error querying OMDb rating for ${imdbId}:`, err);
+  }
+  return undefined;
+}
+
 // API Endpoint to fetch movies (using TMDB proxy exclusively)
 app.post("/api/movies", movieLimiter, async (req, res) => {
   try {
@@ -244,10 +291,14 @@ app.post("/api/movies", movieLimiter, async (req, res) => {
         resStr += `&with_runtime.lte=${maxRuntime}`;
       }
       if (minRating !== undefined && minRating > 0) {
-        resStr += `&vote_average.gte=${minRating}`;
+        // Query TMDB with a slightly lower threshold (widen search area) to fetch candidates that could have high IMDb scores
+        const wideMin = Math.max(1, minRating - 1.2);
+        resStr += `&vote_average.gte=${wideMin}`;
       }
       if (maxRating !== undefined && maxRating > 0) {
-        resStr += `&vote_average.lte=${maxRating}`;
+        // Query TMDB with a slightly higher threshold
+        const wideMax = Math.min(10, maxRating + 1.2);
+        resStr += `&vote_average.lte=${wideMax}`;
       }
       if (minYear !== undefined && minYear > 0) {
         resStr += `&primary_release_date.gte=${minYear}-01-01`;
@@ -360,8 +411,8 @@ app.post("/api/movies", movieLimiter, async (req, res) => {
       [rawResults[i], rawResults[j]] = [rawResults[j], rawResults[i]];
     }
 
-    // Slice the first 20 randomized movie items
-    const items = rawResults.slice(0, 20);
+    // Use a slightly larger pool of candidates so we can satisfy strict IMDb rating filters and still build a 20-movie deck
+    const items = rawResults.slice(0, 35);
 
     // Map TMDB genres to Dutch
     const genreNamesMap: Record<number, string> = {
@@ -384,9 +435,10 @@ app.post("/api/movies", movieLimiter, async (req, res) => {
       // Removed manual synopsis truncation of 150 characters as requested
       const synopsis = item.overview || "Geen beschrijving beschikbaar.";
 
-      const [actualProviders, fetchedTrailerUrl] = await Promise.all([
+      const [actualProviders, fetchedTrailerUrl, imdbId] = await Promise.all([
         getActualProvidersForMovie(String(item.id), tmdbKey, selectedCountry, selectedProviders),
-        getTrailerUrlForMovie(String(item.id), tmdbKey).catch(() => undefined)
+        getTrailerUrlForMovie(String(item.id), tmdbKey).catch(() => undefined),
+        getImdbIdForMovie(String(item.id), tmdbKey).catch(() => undefined)
       ]);
 
       const releaseYear = item.release_date ? item.release_date.split("-")[0] : "2026";
@@ -396,22 +448,51 @@ app.post("/api/movies", movieLimiter, async (req, res) => {
       const originalLang = item.original_language || "en";
       const languageName = LANGUAGE_MAP[originalLang] || originalLang.toUpperCase();
 
+      // Fetch IMDb rating if available and fallback to TMDB automatically if limit 1000/day is reached
+      let finalRating = Number((item.vote_average || 0).toFixed(1));
+      let ratingSource = "TMDB";
+
+      if (imdbId) {
+        const omdbResult = await getOmdbRating(imdbId);
+        if (omdbResult) {
+          finalRating = omdbResult.rating;
+          ratingSource = omdbResult.source;
+        }
+      }
+
       return {
         id: String(item.id),
         title: item.title,
         year: releaseYear,
-        rating: Number((item.vote_average || 0).toFixed(1)),
+        rating: finalRating,
         genres: itemGenres.length > 0 ? itemGenres : ["Film"],
         synopsis: synopsis,
         providers: actualProviders,
         backdrop: backdropUrl,
         trailerUrl,
         language: languageName,
+        ratingSource,
       };
     });
 
     const formattedMovies = await Promise.all(promises);
-    return res.json({ source: "TMDB", movies: formattedMovies });
+
+    // Apply strict final-rating (IMDb or TMDB fallback score) selection
+    let filteredMovies = formattedMovies;
+    if (minRating !== undefined && minRating > 0) {
+      filteredMovies = filteredMovies.filter(m => m.rating >= minRating);
+    }
+    if (maxRating !== undefined && maxRating > 0) {
+      filteredMovies = filteredMovies.filter(m => m.rating <= maxRating);
+    }
+
+    // Keep up to 20 final movies for the curated swipe deck
+    const finalMovies = filteredMovies.slice(0, 20);
+
+    // Fall back to original formatted movies if strict filters left too few elements
+    const moviesToReturn = finalMovies.length >= 5 ? finalMovies : formattedMovies.slice(0, 20);
+
+    return res.json({ source: "TMDB", movies: moviesToReturn });
   } catch (error: any) {
     console.error("Movie curation error:", error);
     return res.status(500).json({ error: error.message || "An error occurred while curating movies." });
@@ -420,6 +501,11 @@ app.post("/api/movies", movieLimiter, async (req, res) => {
 
 // Serve frontend with Vite middleware
 const bootstrap = async () => {
+  const tmdbKeyExists = !!process.env.TMDB_API_KEY;
+  const omdbKeyExists = !!process.env.OMDB_API_KEY;
+  console.log(`[CONFIG DIAGNOSTICS] TMDB_API_KEY provided: ${tmdbKeyExists ? "YES" : "NO"} (${tmdbKeyExists ? process.env.TMDB_API_KEY!.substring(0, 3) + "..." : "none"})`);
+  console.log(`[CONFIG DIAGNOSTICS] OMDB_API_KEY provided: ${omdbKeyExists ? "YES" : "NO"} (${omdbKeyExists ? process.env.OMDB_API_KEY!.substring(0, 3) + "..." : "none"})`);
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },

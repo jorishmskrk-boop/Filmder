@@ -69,7 +69,7 @@ export default function MatchesScreen({
       {/* Grid of Matched Movies */}
       {matches.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {matches.map((movie) => {
+          {[...matches].reverse().map((movie) => {
             const superLikesCount = Object.keys(room?.superLikes || {}).filter(
               (uid) => room?.superLikes?.[uid]?.[movie.id] === true
             ).length;
@@ -99,9 +99,14 @@ export default function MatchesScreen({
                   )}
 
                   {/* Score overlay */}
-                  <div className="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/5 text-[10px] font-bold text-[#ffdb3c]">
-                    <Star className="w-3 h-3 fill-[#ffdb3c] text-[#ffdb3c]" />
-                    <span>{movie.rating}</span>
+                  <div className="absolute top-3 right-3 flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-black/75 backdrop-blur-md border border-white/15 text-[10.5px] font-extrabold shadow-lg">
+                    <Star className="w-3 h-3 fill-[#ffdb3c] text-[#ffdb3c] shrink-0" />
+                    <span className="text-white">{movie.rating}</span>
+                    {movie.ratingSource === "IMDb" ? (
+                      <span className="bg-[#f5c518] text-black text-[8px] font-black px-1.5 py-0.2 rounded-[3.5px] tracking-wide" title="IMDb Score">IMDb</span>
+                    ) : (
+                      <span className="bg-[#01b4e4] text-white text-[8px] font-black px-1.5 py-0.2 rounded-[3.5px] tracking-wide" title="TMDB Score">TMDB</span>
+                    )}
                   </div>
 
                   {/* Cover trailer button overlay */}

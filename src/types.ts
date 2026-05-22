@@ -2,13 +2,14 @@ export interface Movie {
   id: string;          // TMDB ID string or AI-generated unique ID
   title: string;       // Original movie title
   year: string;        // Release year (4 digits)
-  rating: number;      // TMDB user rating scale (e.g., 7.8)
+  rating: number;      // TMDB user rating scale (e.g., 7.8) or IMDb rating
   genres: string[];    // Array of genre strings
   synopsis: string;    // Highly engaging hook sentence summarizing the plot
   providers: string[]; // Lowercase array of active streaming services
   backdrop: string;    // High-quality movie poster backdrop landscape URL
   trailerUrl?: string; // Optional YouTube trailer URL or link
   language?: string;   // Human-readable language of the movie, e.g. "Engels", "Nederlands", "Frans"
+  ratingSource?: string; // e.g. "IMDb" or "TMDB"
 }
 
 export interface Room {
