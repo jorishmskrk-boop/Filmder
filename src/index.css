@@ -50,27 +50,28 @@ body {
 /* Custom polished scrollbar to match the futuristic/dark cinema theme */
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 86, 55, 0.35) rgba(0, 0, 0, 0.2);
+  scrollbar-color: rgba(255, 86, 55, 0.4) rgba(18, 18, 29, 0.5);
+  -webkit-overflow-scrolling: touch; /* Smooth inertia scrolling for modern mobile browsers */
 }
 
 .custom-scrollbar::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 4px;
+  height: 4px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(18, 18, 29, 0.6);
+  background: rgba(0, 0, 0, 0.35);
   border-radius: 999px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 86, 55, 0.4);
+  background: rgba(255, 86, 55, 0.45);
   border-radius: 999px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: none;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 86, 55, 0.65);
+  background: rgba(255, 86, 55, 0.7);
 }
 
 

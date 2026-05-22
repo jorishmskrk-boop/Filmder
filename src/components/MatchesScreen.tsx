@@ -1,6 +1,7 @@
 import { Movie } from "../types";
 import { Award, Star, Play, Ghost } from "lucide-react";
 import ProviderLogo from "./ProviderLogo";
+import { useLanguage } from "../LanguageContext";
 
 interface MatchesScreenProps {
   matches: Movie[];
@@ -8,6 +9,8 @@ interface MatchesScreenProps {
 }
 
 export default function MatchesScreen({ matches, onBackToSwipes }: MatchesScreenProps) {
+  const { language, t } = useLanguage();
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
       
@@ -16,21 +19,25 @@ export default function MatchesScreen({ matches, onBackToSwipes }: MatchesScreen
         <div className="space-y-1">
           <h2 className="text-xl font-bold font-display tracking-tight text-[#e3e0f1] flex items-center gap-2">
             <Award className="w-5 h-5 text-[#ff5637]" />
-            Gezamenlijke Matches
+            {language === "nl" ? "Gezamenlijke Matches" : "Mutual Matches"}
           </h2>
           <p className="text-xs text-slate-300">
             {matches.length === 1 
-              ? "Je hebt 1 gezamenlijke film-match! Pak de popcorn maar alvast!" 
-              : `Jullie hebben ${matches.length} gezamenlijke matches op jullie lijst!`}
+              ? (language === "nl" 
+                  ? "Je hebt 1 gezamenlijke film-match! Pak de popcorn maar alvast!" 
+                  : "You have 1 mutual movie match! Get the popcorn ready!") 
+              : (language === "nl"
+                  ? `Jullie hebben ${matches.length} gezamenlijke matches op jullie lijst!`
+                  : `You have ${matches.length} mutual matches on your list!`)}
           </p>
         </div>
 
         <button
           id="watchlist-back-btn"
           onClick={onBackToSwipes}
-          className="px-5 py-2.5 rounded-full bg-black/20 border border-white/5 hover:bg-white/5 hover:border-[#ff5637]/30 text-white text-xs font-bold transition-all cursor-pointer"
+          className="px-5 py-2.5 rounded-full bg-black/20 border border-white/5 hover:bg-white/5 hover:border-[#ff5637]/30 text-white text-xs font-bold transition-all cursor-pointer select-none"
         >
-          Verder Swipen
+          {language === "nl" ? "Verder Swipen" : "Keep Swiping"}
         </button>
       </div>
 
@@ -44,7 +51,7 @@ export default function MatchesScreen({ matches, onBackToSwipes }: MatchesScreen
               className="glass-card border border-white/5 hover:border-[#ff5637]/45 rounded-2xl overflow-hidden shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 flex flex-col group"
             >
               {/* Cover Backdrop */}
-              <div className="w-full h-36 relative overflow-hidden bg-slate-950">
+              <div className="w-full h-36 relative overflow-hidden bg-slate-950 select-none">
                 <img
                   src={movie.backdrop}
                   alt={movie.title}
@@ -78,10 +85,10 @@ export default function MatchesScreen({ matches, onBackToSwipes }: MatchesScreen
               {/* Data body */}
               <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
                 <div className="space-y-1">
-                  <h3 className="text-base font-bold font-display text-[#e3e0f1] line-clamp-1 group-hover:text-[#ffb4a5] transition-colors">
+                  <h3 className="text-base font-bold font-display text-[#e3e0f1] line-clamp-1 group-hover:text-[#ffb4a5] transition-colors select-text">
                     {movie.title}
                   </h3>
-                  <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-slate-400">
+                  <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-slate-400 select-all">
                     <span>{movie.year}</span>
                     {movie.language && (
                       <>
@@ -92,14 +99,14 @@ export default function MatchesScreen({ matches, onBackToSwipes }: MatchesScreen
                   </div>
                 </div>
 
-                <p className="text-slate-300 text-xs line-clamp-2 leading-relaxed italic block font-medium">
+                <p className="text-slate-310 text-slate-350 text-xs line-clamp-2 leading-relaxed italic block font-medium select-text">
                   "{movie.synopsis}"
                 </p>
 
                 {/* Badge providers listing */}
-                <div className="space-y-2 pt-2.5 border-t border-white/5">
+                <div className="space-y-2 pt-2.5 border-t border-white/5 select-none">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">
-                    Beschikbaar op:
+                    {language === "nl" ? "Beschikbaar op:" : "Available on:"}
                   </span>
                   <div className="flex flex-wrap gap-2.5 items-center">
                     {movie.providers.map((p, idx) => (
@@ -115,14 +122,18 @@ export default function MatchesScreen({ matches, onBackToSwipes }: MatchesScreen
         </div>
       ) : (
         // Empty state
-        <div className="text-center py-16 bg-black/10 border border-white/5 rounded-[2rem] space-y-4">
+        <div className="text-center py-16 bg-black/10 border border-white/5 rounded-[2rem] space-y-4 select-none">
           <div className="w-12 h-12 rounded-full bg-slate-900 flex items-center justify-center text-slate-400 border border-white/10 mx-auto">
             <Ghost className="w-6 h-6" />
           </div>
           <div className="space-y-1">
-            <h3 className="text-base font-bold font-display text-white">Nog geen gezamenlijke matches</h3>
+            <h3 className="text-base font-bold font-display text-white">
+              {language === "nl" ? "Nog geen gezamenlijke matches" : "No mutual matches yet"}
+            </h3>
             <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed px-4">
-              Wanneer jullie allebei 'Leuk' (Rechts Swipen in de app) op exact dezelfde film selecteren, verschijnt die film hier direct live in real-time!
+              {language === "nl" 
+                ? "Wanneer jullie allebei 'Leuk' (Rechts Swipen in de app) op exact dezelfde film selecteren, verschijnt die film hier direct live in real-time!" 
+                : "When both of you swipe 'Like' (Swipe right in the app) on the exact same movie, it will instantly appear here live in real-time!"}
             </p>
           </div>
           <button
@@ -130,7 +141,7 @@ export default function MatchesScreen({ matches, onBackToSwipes }: MatchesScreen
             onClick={onBackToSwipes}
             className="px-6 py-3 bg-gradient-to-r from-[#ff5637] to-[#ba1c00] text-white font-extrabold rounded-full cursor-pointer hover:brightness-110 active:scale-95 transition-all outline-none"
           >
-            Nu beginnen met Swipen
+            {language === "nl" ? "Nu beginnen met Swipen" : "Start Swiping Now"}
           </button>
         </div>
       )}

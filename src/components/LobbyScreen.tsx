@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Copy, Users, Play, ArrowLeft, CheckCircle, Sparkles } from "lucide-react";
 import { Room } from "../types";
+import { useLanguage } from "../LanguageContext";
 
 interface LobbyScreenProps {
   room: Room;
@@ -11,6 +12,7 @@ interface LobbyScreenProps {
 
 export default function LobbyScreen({ room, currentUserId, onStartSwiping, onLeave }: LobbyScreenProps) {
   const [copied, setCopied] = useState(false);
+  const { language, t } = useLanguage();
 
   // Generate dynamic invite link
   const inviteLink = `${window.location.origin}${window.location.pathname}?room=${room.id}`;
@@ -22,7 +24,6 @@ export default function LobbyScreen({ room, currentUserId, onStartSwiping, onLea
   };
 
   const usersList = Object.entries(room.users || {});
-  const partnerName = usersList.find(([uid]) => uid !== currentUserId)?.[1];
   const hasPartner = usersList.length >= 2;
 
   return (
@@ -36,7 +37,7 @@ export default function LobbyScreen({ room, currentUserId, onStartSwiping, onLea
         className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white mb-6 font-bold select-none cursor-pointer transition-colors"
       >
         <ArrowLeft className="w-3.5 h-3.5" />
-        Verlaat Lobby
+        {t("leave_lobby")}
       </button>
 
       {/* Main Container */}
@@ -48,12 +49,12 @@ export default function LobbyScreen({ room, currentUserId, onStartSwiping, onLea
             <Users className="w-6 h-6" />
           </div>
           <h2 className="text-2xl font-bold font-display tracking-tight text-[#e3e0f1]">
-            Film Lobby
+            {t("movie_lobby_title")}
           </h2>
           <div className="flex items-center justify-center gap-1.5 mt-1.5">
             <span className="w-2 h-2 rounded-full bg-[#ffdb3c] animate-ping" />
             <p className="text-[#ffe16d] text-[10px] uppercase font-bold tracking-widest leading-none">
-              Wachten op connectie...
+              {language === "nl" ? "Wachten op connectie..." : "Waiting for connection..."}
             </p>
           </div>
         </div>
@@ -61,7 +62,7 @@ export default function LobbyScreen({ room, currentUserId, onStartSwiping, onLea
         {/* Room Code Display Card */}
         <div className="bg-black/20 border border-white/5 rounded-2xl p-5 space-y-2">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">
-            Deel de Groepscode
+            {t("share_room_code")}
           </span>
           <div className="text-4xl font-black font-display tracking-[0.25em] text-transparent bg-clip-text bg-gradient-to-r from-white via-[#ffb4a5] to-[#ff5637] drop-shadow-[0_0_10px_rgba(255,86,55,0.2)] select-all pl-3">
             {room.id}
@@ -70,8 +71,8 @@ export default function LobbyScreen({ room, currentUserId, onStartSwiping, onLea
 
         {/* Active Participants */}
         <div className="space-y-3">
-          <h3 className="text-xs font-bold text-slate-405 text-slate-400 uppercase tracking-widest text-left pl-1">
-            Verbonden Spelers ({usersList.length}/2)
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest text-left pl-1">
+            {language === "nl" ? `Verbonden Spelers (${usersList.length}/2)` : `Connected Players (${usersList.length}/2)`}
           </h3>
           <div className="space-y-2.5">
             {usersList.map(([uid, username]) => {
@@ -96,7 +97,7 @@ export default function LobbyScreen({ room, currentUserId, onStartSwiping, onLea
                     <span className="font-bold">{username}</span>
                   </div>
                   <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
-                    {isMe ? "Host (Jij)" : "Deelnemer"}
+                    {isMe ? (language === "nl" ? "Host (Jij)" : "Host (You)") : (language === "nl" ? "Deelnemer" : "Participant")}
                   </span>
                 </div>
               );
@@ -104,7 +105,7 @@ export default function LobbyScreen({ room, currentUserId, onStartSwiping, onLea
 
             {!hasPartner && (
               <div className="p-3.5 rounded-xl border border-dashed border-white/10 bg-black/10 text-slate-400 text-xs italic py-4">
-                Wachten totdat een partner verbinding maakt...
+                {language === "nl" ? "Wachten totdat een partner verbinding maakt..." : "Waiting for a partner to join room..."}
               </div>
             )}
           </div>
@@ -113,7 +114,7 @@ export default function LobbyScreen({ room, currentUserId, onStartSwiping, onLea
         {/* Dynamic Invite Link Card */}
         <div className="space-y-2 text-left">
           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block pl-1">
-            Partner Direct Uitnodigen (Kopieer link)
+            {language === "nl" ? "Partner Direct Uitnodigen (Kopieer link)" : "Directly Invite Partner (Copy link)"}
           </label>
           <div className="flex bg-black/20 border border-white/5 hover:border-white/10 rounded-xl overflow-hidden transition-all">
             <input
@@ -142,7 +143,7 @@ export default function LobbyScreen({ room, currentUserId, onStartSwiping, onLea
         <div className="pt-2">
           {!hasPartner && (
             <p className="text-xs text-slate-400 mb-4 leading-relaxed">
-              We raden aan om op je partner te wachten, maar je kunt ook alvast in je eentje beginnen met swipen!
+              {language === "nl" ? "We raden aan om op je partner te wachten, maar je kunt ook alvast in je eentje beginnen met swipen!" : "We recommend waiting for your partner, but you can also start swiping by yourself!"}
             </p>
           )}
           <button
@@ -152,11 +153,11 @@ export default function LobbyScreen({ room, currentUserId, onStartSwiping, onLea
             className="w-full inline-flex items-center justify-center gap-2 py-4 px-6 rounded-full glow-button text-white font-extrabold shadow-lg active:scale-[0.98] transition-all cursor-pointer"
           >
             <Play className="w-4 h-4 fill-white text-white shrink-0" />
-            Start met Swipen
+            {t("start_swiping")}
             {hasPartner && (
               <span className="flex items-center gap-0.5 ml-1.5 text-[9px] px-2 py-0.5 rounded-full bg-black/30 text-[#ffdb3c] font-black uppercase tracking-widest border border-[#ffdb3c]/30 animate-pulse">
                 <Sparkles className="w-3 h-3 text-[#ffdb3c] fill-[#ffdb3c]" />
-                Samen Actief
+                {language === "nl" ? "Samen Actief" : "Together Active"}
               </span>
             )}
           </button>

@@ -4,6 +4,7 @@ import { Heart, X, Sparkles, AlertCircle, Star, RefreshCw, Play } from "lucide-r
 import { Movie, Room } from "../types";
 import Confetti from "./Confetti";
 import ProviderLogo from "./ProviderLogo";
+import { useLanguage } from "../LanguageContext";
 
 interface SwipeScreenProps {
   room: Room;
@@ -14,12 +15,12 @@ interface SwipeScreenProps {
   onFetchNewBatch: () => void;
 }
 
-const REACTION_MAP: Record<string, { label: string; color: string }> = {
-  "❤️": { label: "Favoriet", color: "from-rose-500/20 to-pink-500/20 text-rose-400 border-rose-500/30" },
-  "🔥": { label: "Must Watch", color: "from-orange-500/20 to-amber-550/20 text-amber-400 border-amber-500/30" },
-  "😂": { label: "Hilarisch", color: "from-yellow-500/20 to-lime-500/20 text-yellow-400 border-yellow-500/30" },
-  "🍿": { label: "Zin In", color: "from-emerald-500/20 to-teal-550/20 text-emerald-400 border-emerald-500/30" },
-  "😱": { label: "Spannend", color: "from-violet-500/20 to-fuchsia-500/20 text-violet-400 border-violet-550/30" },
+const REACTION_MAP: Record<string, { label: string; labelEn: string; color: string }> = {
+  "❤️": { label: "Favoriet", labelEn: "Favorite", color: "from-rose-500/20 to-pink-500/20 text-rose-400 border-rose-500/30" },
+  "🔥": { label: "Must Watch", labelEn: "Must Watch", color: "from-orange-500/20 to-amber-550/20 text-amber-400 border-amber-500/30" },
+  "😂": { label: "Hilarisch", labelEn: "Hilarious", color: "from-yellow-500/20 to-lime-500/20 text-yellow-400 border-yellow-500/30" },
+  "🍿": { label: "Zin In", labelEn: "Excited", color: "from-emerald-500/20 to-teal-550/20 text-emerald-400 border-emerald-500/30" },
+  "😱": { label: "Spannend", labelEn: "Thrilling", color: "from-violet-500/20 to-fuchsia-500/20 text-violet-400 border-violet-550/30" },
 };
 
 export default function SwipeScreen({
@@ -30,6 +31,8 @@ export default function SwipeScreen({
   onResetDeck,
   onFetchNewBatch,
 }: SwipeScreenProps) {
+  const { language, t } = useLanguage();
+
   // Find partner details
   const usersList = Object.entries(room.users || {});
   const partnerEntry = usersList.find(([uid]) => uid !== currentUserId);
@@ -69,17 +72,18 @@ export default function SwipeScreen({
     if (timeDiff < 15000) {
       if (activeReactionTimer.current) clearTimeout(activeReactionTimer.current);
 
-      const mapped = REACTION_MAP[reaction.emoji] || { label: reaction.emoji, color: "" };
+      const mapped = REACTION_MAP[reaction.emoji] || { label: reaction.emoji, labelEn: reaction.emoji, color: "" };
+      const displayLabel = language === "nl" ? mapped.label : mapped.labelEn;
       setPartnerReaction({
-        label: mapped.label,
-        text: `${partnerName} stuurde: "${mapped.label}"`,
+        label: displayLabel,
+        text: language === "nl" ? `${partnerName} stuurde: "${displayLabel}"` : `${partnerName} sent: "${displayLabel}"`,
       });
 
       activeReactionTimer.current = setTimeout(() => {
         setPartnerReaction(null);
       }, 2500);
     }
-  }, [room.reactions, partnerId, partnerName]);
+  }, [room.reactions, partnerId, partnerName, language]);
 
   // Monitor matched movies list to trigger full screen celebration only when both players are finished
   const hasCelebrated = useRef(false);
@@ -185,9 +189,13 @@ export default function SwipeScreen({
                     <AlertCircle className="w-6 h-6" />
                   </div>
                   <div className="space-y-1">
-                    <h4 className="font-bold text-[#e3e0f1] font-display">Einde van de filmstapel!</h4>
+                    <h4 className="font-bold text-[#e3e0f1] font-display">
+                      {language === "nl" ? "Einde van de filmstapel!" : "End of the movie stack!"}
+                    </h4>
                     <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
-                      Er zijn geen films meer beschikbaar binnen je geselecteerde criteria en streamingdiensten. Pas de lobby-instellingen aan of herlaad de stapel!
+                      {language === "nl" 
+                        ? "Er zijn geen films meer beschikbaar binnen je geselecteerde criteria en streamingdiensten. Pas de lobby-instellingen aan of herlaad de stapel!"
+                        : "There are no more movies available within your active filters and services. Adjust room filters or reload the stack!"}
                     </p>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-3">
@@ -197,7 +205,7 @@ export default function SwipeScreen({
                       className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold bg-[#12121d] border border-white/10 hover:border-white/30 text-slate-300 rounded-xl cursor-pointer hover:bg-black/30 transition-colors focus-visible:ring-2 focus-visible:ring-[#ff5637] focus:outline-none"
                     >
                       <RefreshCw className="w-3.5 h-3.5 animate-spin-reverse" />
-                      Geziene films herhalen
+                      {language === "nl" ? "Geziene films herhalen" : "Reload watched movies"}
                     </button>
                     <button
                       id="fetch-new-deck-btn"
@@ -205,7 +213,7 @@ export default function SwipeScreen({
                       className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold bg-gradient-to-r from-[#ff5637] to-[#ba1c00] text-white rounded-xl cursor-pointer hover:opacity-95 transition-all shadow-md active:scale-95 focus-visible:ring-2 focus-visible:ring-[#ff5637] focus:outline-none"
                     >
                       <Sparkles className="w-3.5 h-3.5" />
-                      Gloednieuwe stapel ophalen
+                      {language === "nl" ? "Gloednieuwe stapel ophalen" : "Get a brand new stack"}
                     </button>
                   </div>
                 </motion.div>
@@ -222,8 +230,8 @@ export default function SwipeScreen({
                 onClick={() => triggerButtonSwipe(false)}
                 disabled={isActionLocked}
                 className="w-14 h-14 sm:w-16 sm:h-16 rounded-full border border-white/10 bg-[#12121d]/80 flex items-center justify-center text-slate-400 hover:text-white hover:border-white/30 hover:scale-105 transition-all cursor-pointer shadow-lg active:scale-95 disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-red-500 focus:outline-none"
-                title="Slecht weigeren (Links)"
-                aria-label="Weiger deze film en swipe naar links"
+                title={language === "nl" ? "Slecht weigeren (Links)" : "Dislike (Left)"}
+                aria-label={language === "nl" ? "Weiger deze film en swipe naar links" : "Dislike this movie and swipe left"}
               >
                 <X className="w-7 h-7" />
               </button>
@@ -234,8 +242,8 @@ export default function SwipeScreen({
                 onClick={() => triggerButtonSwipe(true)}
                 disabled={isActionLocked}
                 className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-[#ff5637] to-[#ba1c00] flex items-center justify-center text-white shadow-xl shadow-red-500/20 ring-4 ring-[#ff5637]/10 group hover:scale-[1.06] transition-all active:scale-0.96 cursor-pointer disabled:opacity-45 focus-visible:ring-2 focus-visible:ring-green-500 focus:outline-none"
-                title="Leuk vinden (Rechts)"
-                aria-label="Vind deze film leuk en swipe naar rechts"
+                title={language === "nl" ? "Leuk vinden (Rechts)" : "Like (Right)"}
+                aria-label={language === "nl" ? "Vind deze film leuk en swipe naar rechts" : "Like this movie and swipe right"}
               >
                 <Heart className="w-10 h-10 sm:w-12 sm:h-12 fill-white text-white group-hover:scale-110 transition-transform" />
               </button>
@@ -245,8 +253,8 @@ export default function SwipeScreen({
                 type="button"
                 onClick={onResetDeck}
                 className="w-14 h-14 sm:w-16 sm:h-16 rounded-full border border-white/10 bg-[#12121d]/80 flex items-center justify-center text-slate-400 hover:text-[#ffdb3c] hover:border-[#ffdb3c]/50 transition-all cursor-pointer shadow-lg active:scale-95 focus-visible:ring-2 focus-visible:ring-[#ffdb3c] focus:outline-none"
-                title="Stapel resetten"
-                aria-label="Herstart alle wipes in deze lobby opnieuw"
+                title={language === "nl" ? "Stapel resetten" : "Reset stack"}
+                aria-label={language === "nl" ? "Herstart alle wipes in deze lobby opnieuw" : "Restart all swipes in this lobby"}
               >
                 <RefreshCw className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
@@ -255,7 +263,11 @@ export default function SwipeScreen({
 
           {currentMovie && (
             <div className="text-center mt-4 text-[11px] text-slate-500 tracking-wider hidden sm:block">
-              TIP: Gebruik de pijltoetsen <span className="text-[#ffdb3c] font-bold border border-white/10 px-1 py-0.5 rounded bg-black/40">← Links (Weigeren)</span> of <span className="text-[#ff5637] font-bold border border-white/10 px-1 py-0.5 rounded bg-black/40">→ Rechts (Leuk)</span> op je toetsenbord.
+              {language === "nl" ? (
+                <>TIP: Gebruik de pijltoetsen <span className="text-[#ffdb3c] font-bold border border-white/10 px-1 py-0.5 rounded bg-black/40">← Links (Weigeren)</span> of <span className="text-[#ff5637] font-bold border border-white/10 px-1 py-0.5 rounded bg-black/40">→ Rechts (Leuk)</span> op je toetsenbord.</>
+              ) : (
+                <>TIP: Use keyboard arrow keys <span className="text-[#ffdb3c] font-bold border border-white/10 px-1 py-0.5 rounded bg-black/40">← Left (Dislike)</span> or <span className="text-[#ff5637] font-bold border border-white/10 px-1 py-0.5 rounded bg-black/40">→ Right (Like)</span> on your keyboard.</>
+              )}
             </div>
           )}
         </div>
@@ -265,7 +277,9 @@ export default function SwipeScreen({
           
           {/* Live Activity Card */}
           <div className="glass-card rounded-3xl p-6 shadow-sm flex flex-col justify-center border border-white/5">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Live Status</h3>
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">
+              {language === "nl" ? "Live Status" : "Live Status"}
+            </h3>
             <div className="flex items-center gap-3">
               <div className="relative">
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#ff5637] to-[#ba1c00] flex items-center justify-center text-white font-black select-none uppercase font-display border border-white/10">
@@ -275,14 +289,16 @@ export default function SwipeScreen({
               </div>
               <div>
                 <p className="text-sm font-bold text-white leading-tight">
-                  {partnerId ? partnerName : "Alleen Swipen"}
+                  {partnerId ? partnerName : (language === "nl" ? "Alleen Swipen" : "Swiping Solo")}
                 </p>
                 <p className="text-xs text-slate-400 mt-1">
                   {partnerId 
                     ? room.reactions?.[partnerId] 
-                      ? `Reageerde met "${REACTION_MAP[room.reactions[partnerId].emoji]?.label || room.reactions[partnerId].emoji}"` 
-                      : "Swipet door de catalogus..."
-                    : "Nodig je partner uit!"}
+                      ? (language === "nl" 
+                        ? `Reageerde met "${REACTION_MAP[room.reactions[partnerId].emoji]?.label || room.reactions[partnerId].emoji}"`
+                        : `Reacted with "${REACTION_MAP[room.reactions[partnerId].emoji]?.labelEn || room.reactions[partnerId].emoji}"`)
+                      : (language === "nl" ? "Swipet door de catalogus..." : "Swiping through catalog...")
+                    : (language === "nl" ? "Nodig je partner uit!" : "Invite your partner!")}
                 </p>
               </div>
             </div>
@@ -292,7 +308,9 @@ export default function SwipeScreen({
           <div className="glass-card rounded-3xl p-6 flex-1 flex flex-col justify-between border border-white/5 min-h-[180px]">
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Recente Matches</h3>
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                  {language === "nl" ? "Recente Matches" : "Recent Matches"}
+                </h3>
                 <span className="text-xs font-extrabold bg-[#ff5637]/10 text-[#ffb4a5] px-2.5 py-0.5 rounded-full border border-[#ff5637]/25 select-none font-sans">
                   {room.matches?.length || 0} Matches
                 </span>
@@ -326,8 +344,8 @@ export default function SwipeScreen({
                             <span className="inline-flex items-center gap-0.5 text-[#ffdb3c] font-bold">★ {matchItem.rating}</span>
                           </p>
                           <div className="flex gap-1 mt-1">
-                            <span className="w-2.5 h-2.5 rounded-full bg-[#ff5637] animate-pulse" title="Jij vond dit leuk" />
-                            <span className="w-2.5 h-2.5 rounded-full bg-[#ffe16d]" title="Je partner vond dit leuk" />
+                            <span className="w-2.5 h-2.5 rounded-full bg-[#ff5637] animate-pulse" title={language === "nl" ? "Jij vond dit leuk" : "You liked this"} />
+                            <span className="w-2.5 h-2.5 rounded-full bg-[#ffe16d]" title={language === "nl" ? "Je partner vond dit leuk" : "Your partner liked this"} />
                           </div>
                         </div>
                       </div>
@@ -337,7 +355,7 @@ export default function SwipeScreen({
                           target="_blank"
                           rel="noreferrer"
                           className="p-2 bg-[#ff5637]/10 hover:bg-gradient-to-br hover:from-[#ff5637] hover:to-[#ba1c00] text-[#ffb4a5] hover:text-white rounded-xl transition-all border border-white/5 shrink-0 shadow-sm hover:scale-105 cursor-pointer focus-visible:ring-2 focus-visible:ring-red-500 focus:outline-none"
-                          title="Bekijk filmtrailer op YouTube"
+                          title={language === "nl" ? "Bekijk filmtrailer op YouTube" : "Watch trailer on YouTube"}
                           aria-label={`Bekijk trailer van ${matchItem.title}`}
                         >
                           <Play className="w-3.5 h-3.5 fill-current" />
@@ -347,7 +365,9 @@ export default function SwipeScreen({
                   ))
                 ) : (
                   <p className="text-xs text-slate-400 italic py-5 text-center leading-relaxed">
-                    Nog geen gezamenlijke matches. Liket allebei een film om matches te genereren!
+                    {language === "nl" 
+                      ? "Nog geen gezamenlijke matches. Liket allebei een film om matches te genereren!" 
+                      : "No mutual matches yet. Both players must like a movie to trigger a match!"}
                   </p>
                 )}
               </div>
@@ -356,7 +376,9 @@ export default function SwipeScreen({
 
           {/* Reactions Tray without raw emojis */}
           <div className="space-y-3 glass-card rounded-3xl p-4 border border-white/5">
-            <h3 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest text-center">Reactie Sturen</h3>
+            <h3 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest text-center">
+              {language === "nl" ? "Reactie Sturen" : "Send Reaction"}
+            </h3>
             <div className="flex flex-wrap gap-1.5 justify-center">
               {Object.entries(REACTION_MAP).map(([emoji, item]) => (
                 <button
@@ -364,9 +386,9 @@ export default function SwipeScreen({
                   type="button"
                   onClick={() => onSendReaction(emoji)}
                   className="px-3 py-1.5 rounded-xl text-[11px] font-bold border border-white/5 bg-gradient-to-r from-[#ff5637]/10 to-transparent text-[#ffb4a5] select-none cursor-pointer active:scale-95 transition-all hover:border-[#ff5637]/45 hover:from-[#ff5637]/20 focus-visible:ring-2 focus-visible:ring-[#ff5637] focus:outline-none"
-                  aria-label={`Stuur emoji reactie: ${item.label}`}
+                  aria-label={`Stuur emoji reactie: ${language === "nl" ? item.label : item.labelEn}`}
                 >
-                  {item.label}
+                  {language === "nl" ? item.label : item.labelEn}
                 </button>
               ))}
             </div>
@@ -395,7 +417,7 @@ export default function SwipeScreen({
             >
               <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#ff5637]/15 border border-[#ff5637]/30 text-[#ffb4a5] text-xs font-bold uppercase tracking-widest mb-2 animate-bounce font-mono">
                 <Sparkles className="w-3.5 h-3.5 text-[#ffdb3c]" />
-                Jullie hebben een Match!
+                {language === "nl" ? "Jullien hebben een Match!" : "You have a Match!"}
               </div>
 
               <div className="w-full h-36 rounded-2xl overflow-hidden relative border border-white/5 shadow-inner select-none">
@@ -413,7 +435,7 @@ export default function SwipeScreen({
                   {celebrationMatch.title}
                 </h3>
                 <p className="text-[#ffe16d] text-xs font-sans font-extrabold flex items-center justify-center gap-1.5 mt-1 select-none">
-                  <span>Uitgebracht in {celebrationMatch.year}</span>
+                  <span>{language === "nl" ? `Uitgebracht in ${celebrationMatch.year}` : `Released in ${celebrationMatch.year}`}</span>
                   <span className="text-[#ffdb3c]">★ {celebrationMatch.rating}</span>
                 </p>
               </div>
@@ -424,7 +446,7 @@ export default function SwipeScreen({
 
               <div className="flex flex-col items-center gap-2 select-none">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">
-                  Te zien op jouw diensten:
+                  {language === "nl" ? "Te zien op jouw diensten:" : "Available on your streaming services:"}
                 </span>
                 <div className="flex flex-wrap gap-2 justify-center items-center">
                   {celebrationMatch.providers.map((p, idx) => (
@@ -449,7 +471,7 @@ export default function SwipeScreen({
                     aria-label={`Bekijk trailer van ${celebrationMatch.title}`}
                   >
                     <Play className="w-3.5 h-3.5 fill-white text-white shrink-0" />
-                    Bekijk Trailer
+                    {language === "nl" ? "Bekijk Trailer" : "Watch Trailer"}
                   </a>
                 )}
                 <button
@@ -459,7 +481,7 @@ export default function SwipeScreen({
                   className="w-full py-3 px-4 rounded-full glow-button text-white font-extrabold tracking-wide shadow-md active:scale-95 transition-all cursor-pointer text-xs uppercase tracking-widest focus-visible:ring-2 focus-visible:ring-[#ff5637] focus:outline-none"
                   aria-label="Sluit viering en ga door met swipen"
                 >
-                  Verder Swipen!
+                  {language === "nl" ? "Verder Swipen!" : "Keep Swiping!"}
                 </button>
               </div>
             </motion.div>
@@ -485,6 +507,7 @@ const CinephileCard = memo(function CinephileCard({
   swipeDirection,
   setSwipeDirection,
 }: CinephileCardProps) {
+  const { language } = useLanguage();
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-25, 25]);
   const opacity = useTransform(x, [-200, -150, 0, 150, 200], [0.5, 1, 1, 1, 0.5]);
@@ -536,7 +559,7 @@ const CinephileCard = memo(function CinephileCard({
       className="absolute inset-0 bg-[#12121d] rounded-[32px] border border-white/10 overflow-hidden shadow-2xl group flex flex-col justify-between cursor-grab active:cursor-grabbing select-none"
     >
       <div 
-        className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-[1.02]" 
+         className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-[1.02]" 
         style={{ backgroundImage: `url('${movie.backdrop}')` }}
       >
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent"></div>
@@ -547,7 +570,7 @@ const CinephileCard = memo(function CinephileCard({
         style={{ opacity: likeOpacity }}
         className="absolute top-10 left-10 border-4 border-emerald-500 text-emerald-500 font-extrabold text-2xl uppercase px-4 py-1.5 rounded-xl z-25 pointer-events-none select-none tracking-widest font-mono shadow-md shadow-emerald-500/10 bg-black/45 backdrop-blur-xs"
       >
-        VIND IK LEUK!
+        {language === "nl" ? "VIND IK LEUK!" : "I LIKE THIS!"}
       </motion.div>
 
       {/* NOPE Badge Stamp Overlay */}
@@ -555,7 +578,7 @@ const CinephileCard = memo(function CinephileCard({
         style={{ opacity: nopeOpacity }}
         className="absolute top-10 right-10 border-4 border-rose-500 text-rose-500 font-extrabold text-2xl uppercase px-4 py-1.5 rounded-xl z-25 pointer-events-none select-none tracking-widest font-mono shadow-md shadow-rose-500/10 bg-black/45 backdrop-blur-xs"
       >
-        NEE BEDANKT
+        {language === "nl" ? "NEE BEDANKT" : "NO THANK YOU"}
       </motion.div>
 
       <div className="absolute inset-0 p-4 sm:p-6 md:p-8 flex flex-col justify-end z-10 pointer-events-none">
@@ -576,7 +599,7 @@ const CinephileCard = memo(function CinephileCard({
                 target="_blank"
                 rel="noreferrer"
                 className="pointer-events-auto flex items-center gap-1 bg-gradient-to-r from-red-655 to-red-600 hover:from-red-500 hover:to-red-600 border border-red-500/25 px-2 py-1 text-[8.5px] font-extrabold text-white uppercase tracking-widest rounded-full shrink-0 cursor-pointer shadow-md transition-all active:scale-95 hover:scale-105 focus-visible:ring-2 focus-visible:ring-red-550 focus:outline-none"
-                title="Bekijk de trailer op YouTube"
+                title={language === "nl" ? "Bekijk de trailer op YouTube" : "Watch trailer on YouTube"}
                 aria-label={`Bekijk trailer van ${movie.title}`}
               >
                 <Play className="w-2 h-2 fill-white text-white shrink-0" />
@@ -610,7 +633,7 @@ const CinephileCard = memo(function CinephileCard({
               className="text-[10px] text-[#ffdb3c] font-black mt-1 uppercase hover:underline focus-visible:ring-1 focus-visible:ring-[#ff5637] transition-all focus:outline-none cursor-pointer"
               aria-label={synopsisExpanded ? "Toon kortere synopsis" : "Toon volledige synopsis"}
             >
-              {synopsisExpanded ? "Minder tonen ▲" : "Lees meer ▼"}
+              {synopsisExpanded ? (language === "nl" ? "Minder tonen ▲" : "Show less ▲") : (language === "nl" ? "Lees meer ▼" : "Read more ▼")}
             </button>
           )}
         </div>

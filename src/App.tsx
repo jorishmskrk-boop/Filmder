@@ -11,8 +11,10 @@ import MatchesScreen from "./components/MatchesScreen";
 import FilmFlameLogo from "./components/FilmFlameLogo";
 import { LogOut } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
+import { useLanguage } from "./LanguageContext";
 
 export default function App() {
+  const { language, setLanguage, t } = useLanguage();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -64,7 +66,7 @@ export default function App() {
     if (sharedRoom && sharedRoom.length === 4) {
       const upperCode = sharedRoom.toUpperCase();
       setSharedRoomCode(upperCode);
-      toast.success(`Uitnodiging gevonden voor lobby: ${upperCode}! Vul je naam in om deel te nemen.`, {
+      toast.success(t("invitation_received").replace("{code}", upperCode), {
         duration: 6000,
       });
     }
@@ -246,11 +248,11 @@ export default function App() {
       setRoomCode(code);
       setSwipingStarted(false);
       setActiveTab("swipe");
-      toast.success("Lobby succesvol aangemaakt!");
+      toast.success(t("room_created"));
     } catch (err: any) {
       console.error("Error creating matching room:", err);
-      setErrorMsg(err.message || "Er is een fout opgetreden bij het opzetten van de lobby.");
-      toast.error(err.message || "Lobby maken is mislukt.");
+      setErrorMsg(err.message || (language === "nl" ? "Er is een fout opgetreden bij het opzetten van de lobby." : "An error occurred while setting up the lobby."));
+      toast.error(err.message || (language === "nl" ? "Lobby maken is mislukt." : "Failed to create lobby."));
     } finally {
       setLoading(false);
     }
@@ -273,7 +275,7 @@ export default function App() {
       }
 
       if (!roomSnap || !roomSnap.exists()) {
-        throw new Error(`Er bestaat geen lobby met code ${code}. Controleer de code en probeer het opnieuw!`);
+        throw new Error(t("lobby_not_found").replace("{code}", code));
       }
 
       // Update room registered users with joining player
@@ -292,11 +294,11 @@ export default function App() {
 
       // Set URL search parameter cleanly without reloading the page
       window.history.replaceState({}, "", `?room=${code}`);
-      toast.success(`Succesvol verbonden met lobby ${code}!`);
+      toast.success(t("join_success").replace("{code}", code));
     } catch (err: any) {
       console.error("Error joining matching room:", err);
-      setErrorMsg(err.message || "Er is een fout opgetreden bij het deelnemen aan de lobby.");
-      toast.error(err.message || "Deelnemen mislukt.");
+      setErrorMsg(err.message || (language === "nl" ? "Er is een fout opgetreden bij het deelnemen aan de lobby." : "An error occurred while joining the lobby."));
+      toast.error(err.message || (language === "nl" ? "Deelnemen mislukt." : "Join failed."));
     } finally {
       setLoading(false);
     }
@@ -399,7 +401,7 @@ export default function App() {
         handleFirestoreError(err, OperationType.WRITE, docPath);
       }
 
-      toast.success("Alle swipes hersteld!");
+      toast.success(language === "nl" ? "Alle swipes hersteld!" : "All swipes reset!");
     } catch (err) {
       console.error("Error resetting cinephile deck:", err);
     }
@@ -429,7 +431,7 @@ export default function App() {
       });
 
       if (!res.ok) {
-        throw new Error(`Mislukt om nieuwe filmstapel te laden: ${res.statusText}`);
+        throw new Error(language === "nl" ? `Mislukt om nieuwe filmstapel te laden: ${res.statusText}` : `Failed to load new movie deck: ${res.statusText}`);
       }
 
       const moviesData = await res.json();
@@ -447,14 +449,14 @@ export default function App() {
           matches: [],
         });
 
-        toast.success("Er is een gloednieuwe stapel films geladen!");
+        toast.success(language === "nl" ? "Er is een gloednieuwe stapel films geladen!" : "A brand new deck of movies has been loaded!");
       } else {
-        throw new Error("Geen geschikte films gevonden voor de nieuwe instellingen.");
+        throw new Error(language === "nl" ? "Geen geschikte films gevonden voor de nieuwe instellingen." : "No suitable movies found for the new settings.");
       }
     } catch (err: any) {
       console.error("Fout handmatig ophalen van nieuwe batch:", err);
-      setErrorMsg(err.message || "Er is een fout opgetreden bij het laden van een nieuwe filmstapel.");
-      toast.error("Nieuwe batch laden is mislukt.");
+      setErrorMsg(err.message || (language === "nl" ? "Er is een fout opgetreden bij het laden van een nieuwe filmstapel." : "An error occurred while loading a new movie deck."));
+      toast.error(language === "nl" ? "Nieuwe batch laden is mislukt." : "Failed to load new batch.");
     } finally {
       setLoading(false);
     }
@@ -465,7 +467,7 @@ export default function App() {
     setSwipingStarted(false);
     // Clear room query params
     window.history.replaceState({}, "", window.location.pathname);
-    toast("Lobby verlaten.");
+    toast(t("leave_lobby_confirm"));
   };
 
   return (
@@ -496,81 +498,115 @@ export default function App() {
           <h1 className={`text-xl sm:text-3xl font-extrabold tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-white via-[#ffb4a5] to-[#ff5637] font-display select-none transition-all ${
             roomCode ? "hidden min-[380px]:block" : "block"
           }`}>
-            Filmder
+            {t("app_title")}
           </h1>
         </div>
 
-        {roomCode && room && (
-          <div className="flex items-center gap-2 sm:gap-6 relative z-30">
-            {/* Room code badge */}
-            <div className="hidden sm:flex items-center gap-2 bg-[#1b1a26] border border-white/5 px-4 py-2 rounded-full shadow-inner">
-              <span className="w-2 h-2 bg-[#ff5637] rounded-full animate-pulse"></span>
-              <span className="text-xs font-mono tracking-widest text-[#e5bdb6] font-bold">
-                LOBBY: <span className="text-[#ffdb3c] font-black">{roomCode}</span>
-              </span>
-            </div>
-
-            {/* Overlapping player avatar roundels */}
-            <div className="flex -space-x-1.5 shrink-0">
-              {Object.entries(room.users || {}).map(([uid, name]) => {
-                const isMe = uid === user?.uid;
-                const displayName = String(name || "User");
-                return (
-                  <div
-                    key={uid}
-                    className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full border-2 border-[#12121d] flex items-center justify-center text-[10px] sm:text-xs font-black shadow-lg uppercase font-display select-none transition-transform hover:scale-115 shrink-0 ${
-                      isMe ? "bg-gradient-to-br from-[#ff5637] to-[#ba1c00] text-white" : "bg-slate-800 text-[#e3e0f1]"
-                    }`}
-                    title={displayName}
-                  >
-                    {displayName.slice(0, 2)}
-                  </div>
-                );
-              })}
-            </div>
-
-            {swipingStarted && (
-              <div className="flex items-center bg-[#0d0d18] border border-white/5 rounded-2xl p-0.5 sm:p-1 shrink-0 shadow-md">
-                <button
-                  id="tab-swipe-arena"
-                  onClick={() => setActiveTab("swipe")}
-                  className={`px-3 sm:px-4 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer ${
-                    activeTab === "swipe"
-                      ? "bg-[#ff5637]/15 text-[#ffb4a5] border border-[#ff5637]/20 shadow-sm"
-                      : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  Swipen
-                </button>
-                <button
-                  id="tab-watchlist"
-                  onClick={() => setActiveTab("matches")}
-                  className={`px-3 sm:px-4 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all relative cursor-pointer ${
-                    activeTab === "matches"
-                      ? "bg-[#ff5637]/15 text-[#ffb4a5] border border-[#ff5637]/20 shadow-sm"
-                      : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  Matches
-                  {(room.matches || []).length > 0 && (
-                    <span className="absolute -top-1 -right-1 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-[#ff5637] px-1 text-[7px] font-black text-white border-2 border-[#12121d] animate-pulse shadow-md">
-                      {(room.matches || []).length}
-                    </span>
-                  )}
-                </button>
+        <div className="flex items-center gap-2 sm:gap-4 relative z-30">
+          {roomCode && room && (
+            <>
+              {/* Room code badge */}
+              <div className="hidden sm:flex items-center gap-2 bg-[#1b1a26] border border-white/5 px-4 py-2 rounded-full shadow-inner">
+                <span className="w-2 h-2 bg-[#ff5637] rounded-full animate-pulse"></span>
+                <span className="text-xs font-mono tracking-widest text-[#e5bdb6] font-bold">
+                  {t("room_badge")} <span className="text-[#ffdb3c] font-black">{roomCode}</span>
+                </span>
               </div>
-            )}
 
+              {/* Overlapping player avatar roundels */}
+              <div className="flex -space-x-1.5 shrink-0">
+                {Object.entries(room.users || {}).map(([uid, name]) => {
+                  const isMe = uid === user?.uid;
+                  const displayName = String(name || "User");
+                  return (
+                    <div
+                      key={uid}
+                      className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full border-2 border-[#12121d] flex items-center justify-center text-[10px] sm:text-xs font-black shadow-lg uppercase font-display select-none transition-transform hover:scale-115 shrink-0 ${
+                        isMe ? "bg-gradient-to-br from-[#ff5637] to-[#ba1c00] text-white" : "bg-slate-800 text-[#e3e0f1]"
+                      }`}
+                      title={displayName}
+                    >
+                      {displayName.slice(0, 2)}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {swipingStarted && (
+                <div className="flex items-center bg-[#0d0d18] border border-white/5 rounded-2xl p-0.5 sm:p-1 shrink-0 shadow-md">
+                  <button
+                    id="tab-swipe-arena"
+                    onClick={() => setActiveTab("swipe")}
+                    className={`px-3 sm:px-4 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer ${
+                      activeTab === "swipe"
+                        ? "bg-[#ff5637]/15 text-[#ffb4a5] border border-[#ff5637]/20 shadow-sm"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    {t("tab_swipe")}
+                  </button>
+                  <button
+                    id="tab-watchlist"
+                    onClick={() => setActiveTab("matches")}
+                    className={`px-3 sm:px-4 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all relative cursor-pointer ${
+                      activeTab === "matches"
+                        ? "bg-[#ff5637]/15 text-[#ffb4a5] border border-[#ff5637]/20 shadow-sm"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    {t("tab_matches")}
+                    {(room.matches || []).length > 0 && (
+                      <span className="absolute -top-1 -right-1 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-[#ff5637] px-1 text-[7px] font-black text-white border-2 border-[#12121d] animate-pulse shadow-md">
+                        {(room.matches || []).length}
+                      </span>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              <button
+                 id="leave-lobby-header-btn"
+                 onClick={handleLeaveLobby}
+                 className="p-2 text-slate-500 hover:text-[#ff5637] transition-all hover:scale-110 cursor-pointer shrink-0"
+                 title={t("leave_lobby_title")}
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </>
+          )}
+
+          {/* Persistent Language Toggle Switcher in Header */}
+          <div
+            id="language-toggle-header-btn"
+            className="flex items-center gap-2 bg-[#161623]/90 border border-white/10 px-3 py-1.5 rounded-full select-none shrink-0 shadow-md h-9"
+          >
             <button
-               id="leave-lobby-header-btn"
-               onClick={handleLeaveLobby}
-               className="p-2 text-slate-500 hover:text-[#ff5637] transition-all hover:scale-110 cursor-pointer"
-               title="Lobby verlaten"
+              type="button"
+              id="lang-btn-nl"
+              onClick={() => language !== "nl" && setLanguage("nl")}
+              className={`text-base leading-none transition-all cursor-pointer focus:outline-none ${
+                language === "nl" ? "scale-115 filter drop-shadow-[0_0_5px_rgba(255,219,60,0.6)] opacity-100 font-bold" : "opacity-40 hover:opacity-80"
+              }`}
+              title="Wissel naar Nederlands"
+              aria-label="Wissel naar Nederlands"
             >
-              <LogOut className="w-4 h-4" />
+              🇳🇱
+            </button>
+            <span className="text-[9px] text-slate-500 hover:text-slate-500 select-none block">|</span>
+            <button
+              type="button"
+              id="lang-btn-en"
+              onClick={() => language !== "en" && setLanguage("en")}
+              className={`text-base leading-none transition-all cursor-pointer focus:outline-none ${
+                language === "en" ? "scale-115 filter drop-shadow-[0_0_5px_rgba(255,219,60,0.6)] opacity-100 font-bold" : "opacity-40 hover:opacity-80"
+              }`}
+              title="Switch to English"
+              aria-label="Switch to English"
+            >
+              🇬🇧
             </button>
           </div>
-        )}
+        </div>
       </header>
 
       {/* Main Content Area */}
@@ -581,7 +617,7 @@ export default function App() {
           <div className="flex flex-col items-center justify-center py-20 space-y-4 animate-fade-in text-center">
             <div className="w-10 h-10 border-4 border-[#ff5637] border-t-transparent rounded-full animate-spin" />
             <p className="text-xs text-[#e5bdb6] font-mono tracking-wide">
-              Filmstapel selecteren en aanbevelingen van Filmder laden...
+              {t("loading_movies")}
             </p>
           </div>
         )}
@@ -635,13 +671,13 @@ export default function App() {
         <div className="flex items-center gap-4 text-[10px] text-slate-400 font-bold tracking-widest uppercase">
           <span className="flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-[#ff5637] animate-pulse"></span> 
-            REGIO: {room ? room.country : "NL"}
+            {t("regio")}: {room ? room.country : "NL"}
           </span>
           <span className="text-slate-800">|</span>
-          <span className="text-slate-300">SFEER: {room ? room.vibe.toUpperCase() : "FILMSELECTIE"}</span>
+          <span className="text-slate-300">{t("sfeer")}: {room ? (room.vibe ? room.vibe.toUpperCase() : t("sfeer_selectie")) : t("sfeer_selectie")}</span>
         </div>
         <div className="text-[10px] text-slate-400 font-sans hidden sm:block font-extrabold tracking-wide">
-          {room ? `Groepscode: ${room.id}` : "Samen jullie filmavond kiezen"}
+          {room ? `${t("groepscode_footer")} ${room.id}` : t("samen_kiezen_footer")}
         </div>
       </footer>
     </div>
