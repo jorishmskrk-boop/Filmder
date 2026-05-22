@@ -17,13 +17,13 @@ service cloud.firestore {
     }
 
     function isValidRoomCode(code) {
-      return code is string && code.size() == 4 && code.matches('^[0-9]+$');
+      return code is string && code.size() == 5 && code.matches('^[A-Z0-9]+$');
     }
 
     // Main validation function for a Room
     function isValidRoom(data) {
       return data.id is string
-        && data.id.size() == 4
+        && data.id.size() == 5
         && (data.createdAt is int || data.createdAt is float)
         && data.country is string
         && data.country.size() <= 10
@@ -36,6 +36,7 @@ service cloud.firestore {
         && (data.swipes is map)
         && (data.matches is list && data.matches.size() <= 50)
         && (data.reactions is map)
+        && (data.get('expiresAt', null) == null || data.expiresAt is timestamp)
         && (data.get('superLikes', null) == null || data.superLikes is map);
     }
 

@@ -32,6 +32,9 @@ export interface Room {
   minYear?: number;
   maxYear?: number;
   ageRating?: boolean;
+  fallbackLevel?: number;
+  expiresAt?: any;
+  movieReactions?: Record<string, Record<string, string>>; // Maps movieId -> userId -> emoji
 }
 
 export interface Preferences {

@@ -1,7 +1,21 @@
 import { useState, useEffect } from "react";
 import { signInAnonymously, onAuthStateChanged, User } from "firebase/auth";
-import { setDoc, updateDoc, getDoc, arrayUnion } from "firebase/firestore";
-import { auth, OperationType, handleFirestoreError, getRoomRef } from "./firebase";
+import { getDoc } from "firebase/firestore";
+import {
+  auth,
+  OperationType,
+  handleFirestoreError,
+  getRoomRef,
+  createRoomInFirestore,
+  joinRoomInFirestore,
+  swipeMovieInFirestore,
+  addMatchInFirestore,
+  updateMatchesInFirestore,
+  toggleSuperLikeInFirestore,
+  sendGlobalReactionInFirestore,
+  resetRoomDeckInFirestore,
+  loadNewBatchInFirestore
+} from "./firebase";
 import { Movie, Room, Preferences } from "./types";
 import { useRoomSession } from "./hooks/useRoomSession";
 import LandingScreen from "./components/LandingScreen";
@@ -60,11 +74,11 @@ export default function App() {
     return () => unsubscribeAuth();
   }, []);
 
-  // 3. Scan and pre-populate room code if shared in the URL search params (?room=1234)
+  // 3. Scan and pre-populate room code if shared in the URL search params (?room=ABCDE)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const sharedRoom = params.get("room");
-    if (sharedRoom && sharedRoom.length === 4) {
+    if (sharedRoom && (sharedRoom.length === 4 || sharedRoom.length === 5)) {
       const upperCode = sharedRoom.toUpperCase();
       setSharedRoomCode(upperCode);
       toast.success(t("invitation_received").replace("{code}", upperCode), {
@@ -97,9 +111,6 @@ export default function App() {
         setLoading(true);
 
         try {
-          const docPath = `artifacts/flixmatch-default-id/public/data/rooms/${roomCode}`;
-          const roomDocRef = getRoomRef(roomCode);
-
           const res = await fetch("/api/movies", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -126,17 +137,7 @@ export default function App() {
           const movieCollection: Movie[] = moviesData.movies || [];
 
           if (movieCollection.length > 0) {
-            const cleanSwipes: Record<string, any> = {};
-            userIds.forEach((uid) => {
-              cleanSwipes[uid] = {};
-            });
-
-            await updateDoc(roomDocRef, {
-              movies: movieCollection,
-              swipes: cleanSwipes,
-              matches: [],
-            });
-
+            await loadNewBatchInFirestore(roomCode, userIds, movieCollection, true, moviesData.fallbackLevel);
             toast.success("Niemand vond de vorige films leuk... Er is automatisch een nieuwe stapel films geladen!");
           }
         } catch (err) {
@@ -152,9 +153,14 @@ export default function App() {
     }
   }, [room?.swipes, room?.movies, room?.matches, roomCode, user, isAutoLoadingBatch]);
 
-  // Generate unique 4 digit code not intersecting known rooms
+  // Generate unique 5 character alphanumeric code to increase entropy and prevent collisions
   const generate4DigitCode = (): string => {
-    return String(Math.floor(1000 + Math.random() * 9000));
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let code = "";
+    for (let i = 0; i < 5; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
   };
 
   // Create match room session handler
@@ -180,8 +186,6 @@ export default function App() {
           attempts++;
         }
       }
-
-      const docPath = `artifacts/flixmatch-default-id/public/data/rooms/${code}`;
 
       // Call API server-side route to fetch movies using server key ONLY
       const res = await fetch("/api/movies", {
@@ -217,6 +221,7 @@ export default function App() {
       const roomPayload: Room = {
         id: code,
         createdAt: Date.now(),
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // TTL of 24 hours
         country: prefs.country,
         providers: prefs.providers,
         vibe: prefs.vibe,
@@ -240,11 +245,7 @@ export default function App() {
       if (prefs.maxYear !== undefined) roomPayload.maxYear = prefs.maxYear;
       if (prefs.ageRating !== undefined) roomPayload.ageRating = prefs.ageRating;
 
-      try {
-        await setDoc(roomDocRef, roomPayload);
-      } catch (err: any) {
-        handleFirestoreError(err, OperationType.WRITE, docPath);
-      }
+      await createRoomInFirestore(code, roomPayload);
 
       setRoomCode(code);
       setSwipingStarted(false);
@@ -279,15 +280,7 @@ export default function App() {
         throw new Error(t("lobby_not_found").replace("{code}", code));
       }
 
-      // Update room registered users with joining player
-      try {
-        await updateDoc(roomDocRef, {
-          [`users.${user.uid}`]: prefs.name,
-          [`swipes.${user.uid}`]: {},
-        });
-      } catch (err: any) {
-        handleFirestoreError(err, OperationType.WRITE, docPath);
-      }
+      await joinRoomInFirestore(code, user.uid, prefs.name);
 
       setRoomCode(code);
       setSwipingStarted(false);
@@ -309,18 +302,9 @@ export default function App() {
   const handleSwipeMovie = async (movieId: string, liked: boolean) => {
     if (!user || !roomCode || !room) return;
 
-    const docPath = `artifacts/flixmatch-default-id/public/data/rooms/${roomCode}`;
-    const roomDocRef = getRoomRef(roomCode);
-
     try {
       // Save swipe instantly to Firestore
-      try {
-        await updateDoc(roomDocRef, {
-          [`swipes.${user.uid}.${movieId}`]: liked,
-        });
-      } catch (err: any) {
-        handleFirestoreError(err, OperationType.WRITE, docPath);
-      }
+      await swipeMovieInFirestore(roomCode, user.uid, movieId, liked);
 
       // If liked (true), check if all users in the room have liked it
       if (liked) {
@@ -341,14 +325,8 @@ export default function App() {
             });
 
             if (!alreadyMatched) {
-              try {
-                await updateDoc(roomDocRef, {
-                  matches: arrayUnion(movieId),
-                });
-                toast.success("Match gevonden! 🎉", { icon: "🔥" });
-              } catch (err: any) {
-                handleFirestoreError(err, OperationType.WRITE, docPath);
-              }
+              await addMatchInFirestore(roomCode, movieId);
+              toast.success("Match gevonden! 🎉", { icon: "🔥" });
             }
           }
         }
@@ -361,55 +339,38 @@ export default function App() {
   const handleToggleSuperLike = async (movieId: string) => {
     if (!user || !roomCode || !room) return;
 
-    const docPath = `artifacts/flixmatch-default-id/public/data/rooms/${roomCode}`;
-    const roomDocRef = getRoomRef(roomCode);
-
     const alreadySuperLiked = room.superLikes?.[user.uid]?.[movieId] === true;
 
     try {
+      await toggleSuperLikeInFirestore(roomCode, user.uid, movieId, !alreadySuperLiked);
       if (alreadySuperLiked) {
-        await updateDoc(roomDocRef, {
-          [`superLikes.${user.uid}.${movieId}`]: false,
-        });
         toast.success(language === "nl" ? "Extra hartje verwijderd!" : "Extra heart removed!");
       } else {
-        await updateDoc(roomDocRef, {
-          [`superLikes.${user.uid}.${movieId}`]: true,
-        });
         toast.success(language === "nl" ? "Extra hartje toegevoegd! 💖" : "Extra heart added! 💖");
       }
     } catch (err: any) {
       console.error("Error registering extra heart:", err);
-      handleFirestoreError(err, OperationType.WRITE, docPath);
     }
   };
 
   const handleRemoveMatch = async (movieId: string) => {
     if (!user || !roomCode || !room) return;
 
-    const docPath = `artifacts/flixmatch-default-id/public/data/rooms/${roomCode}`;
-    const roomDocRef = getRoomRef(roomCode);
-
     try {
       if (isSolo) {
         // Solo mode: remove from favorites by setting swipe to false
-        await updateDoc(roomDocRef, {
-          [`swipes.${user.uid}.${movieId}`]: false,
-        });
+        await swipeMovieInFirestore(roomCode, user.uid, movieId, false);
         toast.success(language === "nl" ? "Film verwijderd uit favorieten." : "Movie removed from favorites.");
       } else {
         // Multi-user mode: remove from matches array in Firestore
         const currentRawMatches = (room.matches || []).map(m => typeof m === "string" ? m : m.id);
         const updatedMatches = currentRawMatches.filter(id => id !== movieId);
         
-        await updateDoc(roomDocRef, {
-          matches: updatedMatches,
-        });
+        await updateMatchesInFirestore(roomCode, updatedMatches);
         toast.success(language === "nl" ? "Film verwijderd uit matches voor iedereen." : "Movie removed from matches for everyone.");
       }
     } catch (err: any) {
       console.error("Error removing match:", err);
-      handleFirestoreError(err, OperationType.WRITE, docPath);
     }
   };
 
@@ -417,22 +378,10 @@ export default function App() {
   const handleSendReaction = async (emoji: string) => {
     if (!user || !roomCode) return;
 
-    const docPath = `artifacts/flixmatch-default-id/public/data/rooms/${roomCode}`;
-    const roomDocRef = getRoomRef(roomCode);
-
     try {
-      await updateDoc(roomDocRef, {
-        [`reactions.${user.uid}`]: {
-          emoji,
-          timestamp: Date.now(),
-        },
-      });
+      await sendGlobalReactionInFirestore(roomCode, user.uid, emoji);
     } catch (err: any) {
-      try {
-        handleFirestoreError(err, OperationType.WRITE, docPath);
-      } catch (wrappedErr) {
-        console.error("Error sending emoji reaction:", wrappedErr);
-      }
+      console.error("Error sending emoji reaction:", err);
     }
   };
 
@@ -440,25 +389,9 @@ export default function App() {
   const handleResetDeck = async () => {
     if (!roomCode || !room) return;
 
-    const docPath = `artifacts/flixmatch-default-id/public/data/rooms/${roomCode}`;
-    const roomDocRef = getRoomRef(roomCode);
-
     try {
-      // Rebuild clean swipes structure for connected room users
-      const cleanSwipes: Record<string, any> = {};
-      Object.keys(room.users || {}).forEach((uid) => {
-        cleanSwipes[uid] = {};
-      });
-
-      try {
-        await updateDoc(roomDocRef, {
-          swipes: cleanSwipes,
-          matches: [],
-        });
-      } catch (err: any) {
-        handleFirestoreError(err, OperationType.WRITE, docPath);
-      }
-
+      const userIds = Object.keys(room.users || {});
+      await resetRoomDeckInFirestore(roomCode, userIds);
       toast.success(language === "nl" ? "Alle swipes hersteld!" : "All swipes reset!");
     } catch (err) {
       console.error("Error resetting cinephile deck:", err);
@@ -471,9 +404,6 @@ export default function App() {
     setErrorMsg(null);
 
     try {
-      const docPath = `artifacts/flixmatch-default-id/public/data/rooms/${roomCode}`;
-      const roomDocRef = getRoomRef(roomCode);
-
       const res = await fetch("/api/movies", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -496,16 +426,8 @@ export default function App() {
       const movieCollection: Movie[] = moviesData.movies || [];
 
       if (movieCollection.length > 0) {
-        const cleanSwipes: Record<string, any> = {};
-        Object.keys(room.users || {}).forEach((uid) => {
-          cleanSwipes[uid] = {};
-        });
-
-        await updateDoc(roomDocRef, {
-          movies: movieCollection,
-          swipes: cleanSwipes,
-        });
-
+        const userIds = Object.keys(room.users || {});
+        await loadNewBatchInFirestore(roomCode, userIds, movieCollection, false, moviesData.fallbackLevel);
         toast.success(language === "nl" ? "Er is een gloednieuwe stapel films geladen!" : "A brand new deck of movies has been loaded!");
       } else {
         throw new Error(language === "nl" ? "Geen geschikte films gevonden voor de nieuwe instellingen." : "No suitable movies found for the new settings.");

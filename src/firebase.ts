@@ -1,7 +1,8 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { initializeFirestore, persistentLocalCache, doc, persistentMultipleTabManager } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, doc, persistentMultipleTabManager, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
+import { Room, Movie } from './types';
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -64,4 +65,147 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   };
   console.error('Firestore Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
+}
+
+// CENTRALIZED FIRESTORE DECORATOR MUTATION HELPERS
+const getPath = (code: string) => `artifacts/flixmatch-default-id/public/data/rooms/${code}`;
+
+export async function createRoomInFirestore(code: string, roomPayload: Room) {
+  const roomDocRef = getRoomRef(code);
+  try {
+    await setDoc(roomDocRef, roomPayload);
+  } catch (err: any) {
+    handleFirestoreError(err, OperationType.WRITE, getPath(code));
+  }
+}
+
+export async function joinRoomInFirestore(code: string, userId: string, username: string) {
+  const roomDocRef = getRoomRef(code);
+  try {
+    await updateDoc(roomDocRef, {
+      [`users.${userId}`]: username,
+      [`swipes.${userId}`]: {},
+    });
+  } catch (err: any) {
+    handleFirestoreError(err, OperationType.WRITE, getPath(code));
+  }
+}
+
+export async function swipeMovieInFirestore(code: string, userId: string, movieId: string, liked: boolean) {
+  const roomDocRef = getRoomRef(code);
+  try {
+    await updateDoc(roomDocRef, {
+      [`swipes.${userId}.${movieId}`]: liked,
+    });
+  } catch (err: any) {
+    handleFirestoreError(err, OperationType.WRITE, getPath(code));
+  }
+}
+
+export async function addMatchInFirestore(code: string, movieId: string) {
+  const roomDocRef = getRoomRef(code);
+  try {
+    await updateDoc(roomDocRef, {
+      matches: arrayUnion(movieId),
+    });
+  } catch (err: any) {
+    handleFirestoreError(err, OperationType.WRITE, getPath(code));
+  }
+}
+
+export async function updateMatchesInFirestore(code: string, updatedMatches: string[]) {
+  const roomDocRef = getRoomRef(code);
+  try {
+    await updateDoc(roomDocRef, {
+      matches: updatedMatches,
+    });
+  } catch (err: any) {
+    handleFirestoreError(err, OperationType.WRITE, getPath(code));
+  }
+}
+
+export async function toggleSuperLikeInFirestore(code: string, userId: string, movieId: string, superLiked: boolean) {
+  const roomDocRef = getRoomRef(code);
+  try {
+    await updateDoc(roomDocRef, {
+      [`superLikes.${userId}.${movieId}`]: superLiked,
+    });
+  } catch (err: any) {
+    handleFirestoreError(err, OperationType.WRITE, getPath(code));
+  }
+}
+
+export async function sendGlobalReactionInFirestore(code: string, userId: string, emoji: string) {
+  const roomDocRef = getRoomRef(code);
+  try {
+    await updateDoc(roomDocRef, {
+      [`reactions.${userId}`]: {
+        emoji,
+        timestamp: Date.now(),
+      },
+    });
+  } catch (err: any) {
+    handleFirestoreError(err, OperationType.WRITE, getPath(code));
+  }
+}
+
+export async function sendMovieReactionInFirestore(code: string, userId: string, movieId: string, emoji: string) {
+  const roomDocRef = getRoomRef(code);
+  try {
+    await updateDoc(roomDocRef, {
+      [`movieReactions.${movieId}.${userId}`]: emoji,
+    });
+  } catch (err: any) {
+    handleFirestoreError(err, OperationType.WRITE, getPath(code));
+  }
+}
+
+export async function resetRoomDeckInFirestore(code: string, userIds: string[]) {
+  const roomDocRef = getRoomRef(code);
+  const cleanSwipes: Record<string, any> = {};
+  userIds.forEach((uid) => {
+    cleanSwipes[uid] = {};
+  });
+  try {
+    await updateDoc(roomDocRef, {
+      swipes: cleanSwipes,
+      matches: [],
+    });
+  } catch (err: any) {
+    handleFirestoreError(err, OperationType.WRITE, getPath(code));
+  }
+}
+
+export async function loadNewBatchInFirestore(code: string, userIds: string[], movies: Movie[], resetMatches: boolean, fallbackLevel?: number) {
+  const roomDocRef = getRoomRef(code);
+  const cleanSwipes: Record<string, any> = {};
+  userIds.forEach((uid) => {
+    cleanSwipes[uid] = {};
+  });
+  const updatePayload: Record<string, any> = {
+    movies,
+    swipes: cleanSwipes,
+  };
+  if (resetMatches) {
+    updatePayload.matches = [];
+  }
+  if (fallbackLevel !== undefined) {
+    updatePayload.fallbackLevel = fallbackLevel;
+  }
+  try {
+    await updateDoc(roomDocRef, updatePayload);
+  } catch (err: any) {
+    handleFirestoreError(err, OperationType.WRITE, getPath(code));
+  }
+}
+
+export async function prefetchMoviesInFirestore(code: string, movies: Movie[]) {
+  const roomDocRef = getRoomRef(code);
+  try {
+    await updateDoc(roomDocRef, {
+      movies,
+    });
+  } catch (err: any) {
+    handleFirestoreError(err, OperationType.WRITE, getPath(code));
+  }
 }
