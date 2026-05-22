@@ -25,19 +25,18 @@ service cloud.firestore {
       return data.id is string
         && data.id.size() == 5
         && (data.createdAt is int || data.createdAt is float)
-        && data.country is string
-        && data.country.size() <= 10
-        && data.vibe is string
-        && data.vibe.size() <= 100
-        && data.providers is list
-        && data.providers.size() <= 15
-        && (data.movies is list && data.movies.size() <= 50)
-        && (data.users is map)
-        && (data.swipes is map)
-        && (data.matches is list && data.matches.size() <= 50)
-        && (data.reactions is map)
+        && (data.get('country', null) == null || (data.country is string && data.country.size() <= 50))
+        && (data.get('vibe', null) == null || (data.vibe is string && data.vibe.size() <= 1000))
+        && (data.get('providers', null) == null || (data.providers is list && data.providers.size() <= 50))
+        && (data.movies is list && data.movies.size() <= 100)
+        && (data.users is map && data.users.keys().size() <= 50)
+        && (data.swipes is map && data.swipes.keys().size() <= 50)
+        && (data.matches is list && data.matches.size() <= 100)
+        && (data.get('reactions', null) == null || data.reactions is map)
         && (data.get('expiresAt', null) == null || data.expiresAt is timestamp)
-        && (data.get('superLikes', null) == null || data.superLikes is map);
+        && (data.get('superLikes', null) == null || data.superLikes is map)
+        && (data.get('movieReactions', null) == null || data.movieReactions is map)
+        && (data.get('fallbackLevel', null) == null || data.fallbackLevel is int || data.fallbackLevel is float);
     }
 
     // Custom Matcher Room path
@@ -59,19 +58,22 @@ service cloud.firestore {
         && (
           // Allow joining
           (request.resource.data.users.keys().hasAll(resource.data.users.keys())
-          && request.resource.data.users.keys().size() <= 3)
+          && request.resource.data.users.keys().size() <= 50)
           ||
           // Allow swiping
-          (request.resource.data.swipes.keys().size() <= 3)
+          (request.resource.data.swipes.keys().size() <= 50)
           ||
           // Allow reactions
-          (request.resource.data.reactions.keys().size() <= 3)
+          (request.resource.data.reactions.keys().size() <= 50)
           ||
           // Allow matches additions/deletions
-          (request.resource.data.matches.size() <= 50)
+          (request.resource.data.matches.size() <= 100)
           ||
           // Allow superLikes
-          (request.resource.data.get('superLikes', null) == null || request.resource.data.superLikes.keys().size() <= 3)
+          (request.resource.data.get('superLikes', null) == null || request.resource.data.superLikes.keys().size() <= 50)
+          ||
+          // Allow movieReactions
+          (request.resource.data.get('movieReactions', null) == null || request.resource.data.movieReactions.keys().size() <= 50)
         );
 
       allow delete: if false; // Rooms are never deleted via client

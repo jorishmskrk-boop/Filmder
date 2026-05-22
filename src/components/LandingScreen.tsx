@@ -245,8 +245,8 @@ export default function LandingScreen({ onCreateRoom, onJoinRoom, initialJoinCod
 
   const handleJoinSubmit = (e: FormEvent) => {
     e.preventDefault();
-    const cleanCode = joinCode.trim();
-    if (cleanCode.length === 4) {
+    const cleanCode = joinCode.trim().toUpperCase();
+    if (cleanCode.length === 4 || cleanCode.length === 5) {
       saveToLocalStorage();
       onJoinRoom(cleanCode, currentPrefs);
     }
@@ -769,17 +769,16 @@ export default function LandingScreen({ onCreateRoom, onJoinRoom, initialJoinCod
               <input
                 id="join-code-input"
                 type="text"
-                pattern="[0-9]*"
-                maxLength={4}
+                maxLength={5}
                 value={joinCode}
-                onChange={(e) => setJoinCode(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                className="w-full bg-black/20 border border-white/5 focus:border-[#ff5637] text-center text-2xl tracking-[0.5em] font-black py-3 text-white rounded-xl focus:outline-none"
-                placeholder="0000"
+                onChange={(e) => setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5))}
+                className="w-full bg-black/20 border border-white/5 focus:border-[#ff5637] text-center text-2xl tracking-[0.2em] font-black py-3 text-white rounded-xl focus:outline-none placeholder:tracking-normal"
+                placeholder="CODE5"
               />
               <button
                 id="join-submit-btn"
                 type="submit"
-                disabled={joinCode.length !== 4}
+                disabled={joinCode.length !== 4 && joinCode.length !== 5}
                 className="px-6 rounded-full glow-button text-white font-extrabold cursor-pointer disabled:opacity-45 disabled:pointer-events-none transition-all"
               >
                 {t("connect_lobby_btn")}

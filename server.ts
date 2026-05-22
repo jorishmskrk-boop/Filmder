@@ -76,15 +76,22 @@ const movieLimiter = rateLimit({
 
 const movieCache = new NodeCache({ stdTTL: 86450, checkperiod: 600 }); // ~24h TTL
 
-const generateCacheKey = (body: any): string => {
-  const providersPart = Array.isArray(body.providers) ? [...body.providers].sort().join(",") : "";
-  return `movies_${body.country || "NL"}_${providersPart}_${body.vibe || ""}_${body.minRuntime || ""}_${body.maxRuntime || ""}_${body.minRating || ""}_${body.maxRating || ""}_${body.minYear || ""}_${body.maxYear || ""}_${body.releaseDecade || ""}_${body.ageRating || ""}`;
-};
+interface CachedMovieDetails {
+  imdbId?: string;
+  fetchedTrailerUrl?: string;
+  offeredProviderIds: number[];
+}
 
 // Helper function to fetch IMDb rating from OMDb API with automatic limits fallback to TMDB
 async function getOmdbRating(imdbId: string | undefined): Promise<{ rating: number; source: string } | undefined> {
   const omdbKey = process.env.OMDB_API_KEY;
   if (!imdbId || !omdbKey || !omdbKey.trim()) return undefined;
+
+  const cacheKey = `omdb_rating_${imdbId}`;
+  const cached = movieCache.get<{ rating: number; source: string }>(cacheKey);
+  if (cached) {
+    return cached;
+  }
 
   try {
     const controller = new AbortController();
@@ -99,7 +106,9 @@ async function getOmdbRating(imdbId: string | undefined): Promise<{ rating: numb
       if (data.Response === "True" && data.imdbRating && data.imdbRating !== "N/A") {
         const parsedRating = parseFloat(data.imdbRating);
         if (!isNaN(parsedRating) && parsedRating > 0) {
-          return { rating: parsedRating, source: "IMDb" };
+          const result = { rating: parsedRating, source: "IMDb" };
+          movieCache.set(cacheKey, result);
+          return result;
         }
       } else if (data.Response === "False") {
         console.warn(`OMDb lookup failed or limit hit (1000/day reached) for ${imdbId}: ${data.Error}`);
@@ -119,12 +128,6 @@ async function getOmdbRating(imdbId: string | undefined): Promise<{ rating: numb
 app.post("/api/movies", movieLimiter, async (req, res) => {
   try {
     const body = req.body || {};
-    const cacheKey = generateCacheKey(body);
-    const cachedResponse = movieCache.get(cacheKey);
-    if (cachedResponse) {
-      console.log(`[CACHE HIT] Returning cached movie stack for key: ${cacheKey}`);
-      return res.json(cachedResponse);
-    }
 
     const { country, providers, vibe, ageRating } = body as {
       country?: string;
@@ -389,55 +392,85 @@ app.post("/api/movies", movieLimiter, async (req, res) => {
       let fetchedTrailerUrl: string | undefined = undefined;
       let imdbId: string | undefined = undefined;
 
-      try {
-        // Fetch details in a single query with watch/providers, videos, and external_ids appended
-        const detailsRes = await fetch(
-          `https://api.themoviedb.org/3/movie/${item.id}?api_key=${tmdbKey}&append_to_response=watch/providers,videos,external_ids`
-        );
-        if (detailsRes.ok) {
-          const details = await detailsRes.json() as {
-            external_ids?: { imdb_id?: string };
-            videos?: { results?: { site?: string; type?: string; key?: string }[] };
-            "watch/providers"?: { results?: Record<string, { flatrate?: { provider_id: number }[]; rent?: { provider_id: number }[]; buy?: { provider_id: number }[]; free?: { provider_id: number }[]; ads?: { provider_id: number }[] }> };
-          };
+      const detailsCacheKey = `tmdb_details_${item.id}`;
+      const cachedDetails = movieCache.get<CachedMovieDetails>(detailsCacheKey);
 
-          // 1. Resolve IMDb ID
-          imdbId = details.external_ids?.imdb_id || undefined;
-
-          // 2. Resolve YouTube Trailer URL
-          const videos = details.videos?.results || [];
-          const trailer = videos.find(v => v.site === "YouTube" && v.type === "Trailer") || 
-                          videos.find(v => v.site === "YouTube" && v.type === "Teaser") ||
-                          videos.find(v => v.site === "YouTube");
-          if (trailer?.key) {
-            fetchedTrailerUrl = `https://www.youtube.com/watch?v=${trailer.key}`;
-          }
-
-          // 3. Resolve watch providers
-          const providerResults = details["watch/providers"]?.results || {};
-          const regionData = providerResults[selectedCountry] || providerResults["NL"] || providerResults["US"] || {};
-          
-          const flatrate = regionData.flatrate || [];
-          const rent = regionData.rent || [];
-          const buy = regionData.buy || [];
-          const free = regionData.free || [];
-          const ads = regionData.ads || [];
-          
-          const allProviders = [...flatrate, ...rent, ...buy, ...free, ...ads];
-          const offeredProviderIds = allProviders.map(p => p.provider_id);
-          
-          const matchedProviders = selectedProviders.filter(p => {
-            if (p === "pirate") return true;
-            const matchId = PROVIDER_MAP[p];
-            return offeredProviderIds.includes(matchId);
-          });
-          
-          if (matchedProviders.length > 0) {
-            actualProviders = matchedProviders;
-          }
+      if (cachedDetails) {
+        imdbId = cachedDetails.imdbId;
+        fetchedTrailerUrl = cachedDetails.fetchedTrailerUrl;
+        const matchedProviders = selectedProviders.filter(p => {
+          if (p === "pirate") return true;
+          const matchId = PROVIDER_MAP[p];
+          return cachedDetails.offeredProviderIds.includes(matchId);
+        });
+        if (matchedProviders.length > 0) {
+          actualProviders = matchedProviders;
         }
-      } catch (err) {
-        console.error(`Error with append_to_response details query for movie ${item.id}:`, err);
+      } else {
+        try {
+          // Fetch details in a single query with watch/providers, videos, and external_ids appended
+          const detailsRes = await fetch(
+            `https://api.themoviedb.org/3/movie/${item.id}?api_key=${tmdbKey}&append_to_response=watch/providers,videos,external_ids`
+          );
+          if (detailsRes.ok) {
+            const details = await detailsRes.json() as {
+              external_ids?: { imdb_id?: string };
+              videos?: { results?: { site?: string; type?: string; key?: string }[] };
+              "watch/providers"?: { results?: Record<string, { flatrate?: { provider_id: number }[]; rent?: { provider_id: number }[]; buy?: { provider_id: number }[]; free?: { provider_id: number }[]; ads?: { provider_id: number }[] }> };
+            };
+
+            // 1. Resolve IMDb ID
+            imdbId = details.external_ids?.imdb_id || undefined;
+
+            // 2. Resolve YouTube Trailer URL
+            const videos = details.videos?.results || [];
+            const trailer = videos.find(v => v.site === "YouTube" && v.type === "Trailer") || 
+                            videos.find(v => v.site === "YouTube" && v.type === "Teaser") ||
+                            videos.find(v => v.site === "YouTube");
+            if (trailer?.key) {
+              fetchedTrailerUrl = `https://www.youtube.com/watch?v=${trailer.key}`;
+            }
+
+            // 3. Resolve watch providers across Dutch, US and current country to find matching offeredProviderIds
+            const providerResults = details["watch/providers"]?.results || {};
+            const offeredProviderIds: number[] = [];
+            
+            const targetRegions = [selectedCountry, "NL", "US"];
+            for (const region of targetRegions) {
+              const regionData = providerResults[region] || {};
+              const flatrate = regionData.flatrate || [];
+              const rent = regionData.rent || [];
+              const buy = regionData.buy || [];
+              const free = regionData.free || [];
+              const ads = regionData.ads || [];
+              const combined = [...flatrate, ...rent, ...buy, ...free, ...ads];
+              for (const p of combined) {
+                if (p.provider_id && !offeredProviderIds.includes(p.provider_id)) {
+                  offeredProviderIds.push(p.provider_id);
+                }
+              }
+            }
+
+            // Save to details cache
+            movieCache.set(detailsCacheKey, {
+              imdbId,
+              fetchedTrailerUrl,
+              offeredProviderIds
+            });
+
+            const matchedProviders = selectedProviders.filter(p => {
+              if (p === "pirate") return true;
+              const matchId = PROVIDER_MAP[p];
+              return offeredProviderIds.includes(matchId);
+            });
+            
+            if (matchedProviders.length > 0) {
+              actualProviders = matchedProviders;
+            }
+          }
+        } catch (err) {
+          console.error(`Error with append_to_response details query for movie ${item.id}:`, err);
+        }
       }
 
       const fallbackTrailer = `https://www.youtube.com/results?search_query=${encodeURIComponent(item.title + " " + releaseYear + " trailer NL")}`;
@@ -488,7 +521,6 @@ app.post("/api/movies", movieLimiter, async (req, res) => {
     const moviesToReturn = finalMovies.length >= 5 ? finalMovies : formattedMovies.slice(0, 20);
 
     const responsePayload = { source: "TMDB", movies: moviesToReturn, fallbackLevel: activeFallbackLevel };
-    movieCache.set(cacheKey, responsePayload);
 
     return res.json(responsePayload);
   } catch (error: any) {
