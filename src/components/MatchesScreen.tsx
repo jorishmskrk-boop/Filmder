@@ -1,5 +1,6 @@
 import { Movie } from "../types";
 import { Award, Star, Play, Ghost } from "lucide-react";
+import ProviderLogo from "./ProviderLogo";
 
 interface MatchesScreenProps {
   matches: Movie[];
@@ -100,14 +101,11 @@ export default function MatchesScreen({ matches, onBackToSwipes }: MatchesScreen
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">
                     Beschikbaar op:
                   </span>
-                  <div className="flex flex-wrap gap-1">
+                  <div className="flex flex-wrap gap-2.5 items-center">
                     {movie.providers.map((p, idx) => (
-                      <span
-                        key={idx}
-                        className="px-2.5 py-0.5 rounded-full bg-[#8c7fff]/15 text-[#cec9ff] border border-[#8c7fff]/25 text-[10px] font-bold uppercase tracking-wider"
-                      >
-                        {p === "disney" ? "Disney+" : p === "prime" ? "Prime Video" : p === "apple" ? "Apple TV" : p === "npostart" ? "NPO Start" : p.charAt(0).toUpperCase() + p.slice(1)}
-                      </span>
+                      <div key={idx} className="w-14 h-9 overflow-hidden rounded-xl shadow shrink-0 select-none">
+                        <ProviderLogo id={p} active={true} size={15} />
+                      </div>
                     ))}
                   </div>
                 </div>

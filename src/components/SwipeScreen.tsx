@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, SVGProps } from "react";
+import { useState, useEffect, useRef, SVGProps, memo } from "react";
 import { motion, AnimatePresence, useMotionValue, useTransform } from "motion/react";
-import { Heart, X, Sparkles, AlertCircle, Award, Star, RefreshCw, MessageSquare, Info, Play } from "lucide-react";
+import { Heart, X, Sparkles, AlertCircle, Star, RefreshCw, Play } from "lucide-react";
 import { Movie, Room } from "../types";
 import Confetti from "./Confetti";
 import ProviderLogo from "./ProviderLogo";
@@ -49,6 +49,9 @@ export default function SwipeScreen({
 
   // Track swipe direction for exit animation custom propagation
   const [swipeDirection, setSwipeDirection] = useState<"like" | "dislike" | null>(null);
+
+  // Action Lock for UI Buttons to avoid double swipe glitches
+  const [isActionLocked, setIsActionLocked] = useState(false);
 
   // Reset direction on card change
   useEffect(() => {
@@ -102,24 +105,32 @@ export default function SwipeScreen({
     }
   }, [room.matches, room.users, room.swipes, room.movies]);
 
+  // Unified controller to handle swipes safety with action-locks
+  const triggerButtonSwipe = (liked: boolean) => {
+    if (isActionLocked || unswipedMovies.length === 0) return;
+    setIsActionLocked(true);
+    setSwipeDirection(liked ? "like" : "dislike");
+    onSwipe(unswipedMovies[0].id, liked);
+    setTimeout(() => {
+      setIsActionLocked(false);
+    }, 350);
+  };
+
   // Swiping keyboard events
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (celebrationMatch) return;
       if (unswipedMovies.length === 0) return;
 
-      const topMovie = unswipedMovies[0];
       if (e.key === "ArrowLeft") {
-        setSwipeDirection("dislike");
-        onSwipe(topMovie.id, false);
+        triggerButtonSwipe(false);
       } else if (e.key === "ArrowRight") {
-        setSwipeDirection("like");
-        onSwipe(topMovie.id, true);
+        triggerButtonSwipe(true);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [unswipedMovies, onSwipe, celebrationMatch]);
+  }, [unswipedMovies, celebrationMatch, isActionLocked]);
 
   const currentMovie = unswipedMovies[0];
 
@@ -141,13 +152,13 @@ export default function SwipeScreen({
         )}
       </AnimatePresence>
 
-      <div className="flex flex-col lg:flex-row gap-8 items-stretch justify-center min-h-[calc(100vh-180px)]">
+      <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 items-stretch justify-center min-h-[calc(100vh-180px)]">
         
         {/* Left Column: Swiper Deck Area */}
-        <div className="flex-[1.8] flex flex-col items-center justify-center relative bg-black/20 border border-white/5 p-6 md:p-8 rounded-[40px] w-full">
+        <div className="flex-[1.8] flex flex-col items-center justify-center relative bg-black/20 border border-white/5 p-4 sm:p-6 md:p-8 rounded-[28px] sm:rounded-[40px] w-full">
           
           {/* Movie Card Stack */}
-          <div className="relative w-full max-w-[520px] h-[340px] md:h-[360px]">
+          <div className="relative w-full max-w-[520px] h-[430px] min-[400px]:h-[470px] sm:h-[510px]">
             
             {/* Background Cards */}
             {currentMovie && (
@@ -183,7 +194,7 @@ export default function SwipeScreen({
                     <button
                       id="reset-deck-btn"
                       onClick={onResetDeck}
-                      className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold bg-[#12121d] border border-white/10 hover:border-white/30 text-slate-300 rounded-xl cursor-pointer hover:bg-black/30 transition-colors"
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold bg-[#12121d] border border-white/10 hover:border-white/30 text-slate-300 rounded-xl cursor-pointer hover:bg-black/30 transition-colors focus-visible:ring-2 focus-visible:ring-[#ff5637] focus:outline-none"
                     >
                       <RefreshCw className="w-3.5 h-3.5 animate-spin-reverse" />
                       Geziene films herhalen
@@ -191,7 +202,7 @@ export default function SwipeScreen({
                     <button
                       id="fetch-new-deck-btn"
                       onClick={onFetchNewBatch}
-                      className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold bg-gradient-to-r from-[#ff5637] to-[#ba1c00] text-white rounded-xl cursor-pointer hover:opacity-95 transition-all shadow-md active:scale-95"
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold bg-gradient-to-r from-[#ff5637] to-[#ba1c00] text-white rounded-xl cursor-pointer hover:opacity-95 transition-all shadow-md active:scale-95 focus-visible:ring-2 focus-visible:ring-[#ff5637] focus:outline-none"
                     >
                       <Sparkles className="w-3.5 h-3.5" />
                       Gloednieuwe stapel ophalen
@@ -204,51 +215,52 @@ export default function SwipeScreen({
 
           {/* Swipe Action Controls */}
           {currentMovie && (
-            <div className="flex items-center gap-8 mt-12">
+            <div className="flex items-center gap-5 sm:gap-8 mt-6 sm:mt-10 md:mt-12 select-none">
               <button
                 id="swipe-dislike-btn"
                 type="button"
-                onClick={() => {
-                  setSwipeDirection("dislike");
-                  onSwipe(currentMovie.id, false);
-                }}
-                className="w-16 h-16 rounded-full border border-white/10 bg-[#12121d]/80 flex items-center justify-center text-slate-400 hover:text-white hover:border-white/30 hover:scale-105 transition-all cursor-pointer shadow-lg active:scale-95"
+                onClick={() => triggerButtonSwipe(false)}
+                disabled={isActionLocked}
+                className="w-14 h-14 sm:w-16 sm:h-16 rounded-full border border-white/10 bg-[#12121d]/80 flex items-center justify-center text-slate-400 hover:text-white hover:border-white/30 hover:scale-105 transition-all cursor-pointer shadow-lg active:scale-95 disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-red-500 focus:outline-none"
                 title="Slecht weigeren (Links)"
+                aria-label="Weiger deze film en swipe naar links"
               >
-                <X className="w-8 h-8" />
+                <X className="w-7 h-7" />
               </button>
               
               <button
                 id="swipe-like-btn"
                 type="button"
-                onClick={() => {
-                  setSwipeDirection("like");
-                  onSwipe(currentMovie.id, true);
-                }}
-                className="w-24 h-24 rounded-full bg-gradient-to-br from-[#ff5637] to-[#ba1c00] flex items-center justify-center text-white shadow-xl shadow-red-500/20 ring-4 ring-[#ff5637]/10 group hover:scale-[1.06] transition-all active:scale-0.96 cursor-pointer"
+                onClick={() => triggerButtonSwipe(true)}
+                disabled={isActionLocked}
+                className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-[#ff5637] to-[#ba1c00] flex items-center justify-center text-white shadow-xl shadow-red-500/20 ring-4 ring-[#ff5637]/10 group hover:scale-[1.06] transition-all active:scale-0.96 cursor-pointer disabled:opacity-45 focus-visible:ring-2 focus-visible:ring-green-500 focus:outline-none"
                 title="Leuk vinden (Rechts)"
+                aria-label="Vind deze film leuk en swipe naar rechts"
               >
-                <Heart className="w-12 h-12 fill-white text-white group-hover:scale-110 transition-transform" />
+                <Heart className="w-10 h-10 sm:w-12 sm:h-12 fill-white text-white group-hover:scale-110 transition-transform" />
               </button>
 
               <button
                 id="swipe-reset-btn"
                 type="button"
                 onClick={onResetDeck}
-                className="w-16 h-16 rounded-full border border-white/10 bg-[#12121d]/80 flex items-center justify-center text-slate-400 hover:text-[#ffdb3c] hover:border-[#ffdb3c]/50 transition-all cursor-pointer shadow-lg active:scale-95"
+                className="w-14 h-14 sm:w-16 sm:h-16 rounded-full border border-white/10 bg-[#12121d]/80 flex items-center justify-center text-slate-400 hover:text-[#ffdb3c] hover:border-[#ffdb3c]/50 transition-all cursor-pointer shadow-lg active:scale-95 focus-visible:ring-2 focus-visible:ring-[#ffdb3c] focus:outline-none"
                 title="Stapel resetten"
+                aria-label="Herstart alle wipes in deze lobby opnieuw"
               >
-                <RefreshCw className="w-6 h-6" />
+                <RefreshCw className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             </div>
           )}
 
           {currentMovie && (
-            <div className="text-center mt-4 text-[11px] text-slate-500 tracking-wider">
+            <div className="text-center mt-4 text-[11px] text-slate-500 tracking-wider hidden sm:block">
               TIP: Gebruik de pijltoetsen <span className="text-[#ffdb3c] font-bold border border-white/10 px-1 py-0.5 rounded bg-black/40">← Links (Weigeren)</span> of <span className="text-[#ff5637] font-bold border border-white/10 px-1 py-0.5 rounded bg-black/40">→ Rechts (Leuk)</span> op je toetsenbord.
             </div>
-          )} </div>
-                  {/* Right Column: Immersive Info & Activity Sidebar */}
+          )}
+        </div>
+
+        {/* Right Column: Immersive Info & Activity Sidebar */}
         <aside className="flex-1 flex flex-col gap-6 justify-between lg:max-w-xs xl:max-w-sm w-full">
           
           {/* Live Activity Card */}
@@ -281,29 +293,39 @@ export default function SwipeScreen({
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Recente Matches</h3>
-                <span className="text-xs font-extrabold bg-[#ff5637]/10 text-[#ffb4a5] px-2.5 py-0.5 rounded-full border border-[#ff5637]/25 select-none">
+                <span className="text-xs font-extrabold bg-[#ff5637]/10 text-[#ffb4a5] px-2.5 py-0.5 rounded-full border border-[#ff5637]/25 select-none font-sans">
                   {room.matches?.length || 0} Matches
                 </span>
               </div>
               
-              <div className="space-y-4 max-h-[160px] overflow-y-auto custom-scrollbar pr-1">
+              <div className="space-y-4 max-h-[170px] overflow-y-auto custom-scrollbar pr-1">
                 {room.matches && room.matches.length > 0 ? (
                   room.matches.slice(-3).reverse().map((matchItem) => (
                     <div key={matchItem.id} className="flex gap-3 group animate-all duration-300 items-center justify-between">
                       <div className="flex gap-3 items-center min-w-0">
-                        <div
-                          className="w-10 h-14 rounded-lg bg-cover bg-center shrink-0 border border-white/5"
-                          style={{ backgroundImage: `url('${matchItem.backdrop}')` }}
-                        />
+                        <div className="relative shrink-0 select-none">
+                          <div
+                            className="w-10 h-14 rounded-lg bg-cover bg-center border border-white/5"
+                            style={{ backgroundImage: `url('${matchItem.backdrop}')` }}
+                          />
+                          {/* Rich integration: Show active provider logos overlaid on match items */}
+                          <div className="absolute -bottom-1 -right-1 flex gap-0.5 bg-[#12121d]/90 backdrop-blur-xs p-0.5 rounded-md border border-white/10 scale-85">
+                            {matchItem.providers?.slice(0, 2).map((prov) => (
+                              <div key={prov} className="w-4.5 h-3 overflow-hidden rounded-xs shrink-0 select-none shadow">
+                                <ProviderLogo id={prov} active={true} size={8} />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                         <div className="flex flex-col justify-center min-w-0 font-sans">
                           <p className="text-sm font-bold text-white group-hover:text-[#ff5637] leading-tight line-clamp-1 transition-colors font-display">
                             {matchItem.title}
                           </p>
-                          <p className="text-[11px] text-slate-400 mt-0.5 gap-1.5 flex items-center">
+                          <p className="text-[11px] text-slate-300 mt-0.5 gap-1.5 flex items-center">
                             <span>{matchItem.year}</span>
                             <span className="inline-flex items-center gap-0.5 text-[#ffdb3c] font-bold">★ {matchItem.rating}</span>
                           </p>
-                          <div className="flex gap-1 mt-1.5">
+                          <div className="flex gap-1 mt-1">
                             <span className="w-2.5 h-2.5 rounded-full bg-[#ff5637] animate-pulse" title="Jij vond dit leuk" />
                             <span className="w-2.5 h-2.5 rounded-full bg-[#ffe16d]" title="Je partner vond dit leuk" />
                           </div>
@@ -314,8 +336,9 @@ export default function SwipeScreen({
                           href={matchItem.trailerUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="p-2 bg-[#ff5637]/10 hover:bg-gradient-to-br hover:from-[#ff5637] hover:to-[#ba1c00] text-[#ffb4a5] hover:text-white rounded-xl transition-all border border-white/5 shrink-0 shadow-sm hover:scale-105 cursor-pointer"
+                          className="p-2 bg-[#ff5637]/10 hover:bg-gradient-to-br hover:from-[#ff5637] hover:to-[#ba1c00] text-[#ffb4a5] hover:text-white rounded-xl transition-all border border-white/5 shrink-0 shadow-sm hover:scale-105 cursor-pointer focus-visible:ring-2 focus-visible:ring-red-500 focus:outline-none"
                           title="Bekijk filmtrailer op YouTube"
+                          aria-label={`Bekijk trailer van ${matchItem.title}`}
                         >
                           <Play className="w-3.5 h-3.5 fill-current" />
                         </a>
@@ -340,7 +363,8 @@ export default function SwipeScreen({
                   key={emoji}
                   type="button"
                   onClick={() => onSendReaction(emoji)}
-                  className="px-3 py-1.5 rounded-xl text-[11px] font-bold border border-white/5 bg-gradient-to-r from-[#ff5637]/10 to-transparent text-[#ffb4a5] select-none cursor-pointer active:scale-95 transition-all hover:border-[#ff5637]/45 hover:from-[#ff5637]/20"
+                  className="px-3 py-1.5 rounded-xl text-[11px] font-bold border border-white/5 bg-gradient-to-r from-[#ff5637]/10 to-transparent text-[#ffb4a5] select-none cursor-pointer active:scale-95 transition-all hover:border-[#ff5637]/45 hover:from-[#ff5637]/20 focus-visible:ring-2 focus-visible:ring-[#ff5637] focus:outline-none"
+                  aria-label={`Stuur emoji reactie: ${item.label}`}
                 >
                   {item.label}
                 </button>
@@ -374,7 +398,7 @@ export default function SwipeScreen({
                 Jullie hebben een Match!
               </div>
 
-              <div className="w-full h-36 rounded-2xl overflow-hidden relative border border-white/5 shadow-inner">
+              <div className="w-full h-36 rounded-2xl overflow-hidden relative border border-white/5 shadow-inner select-none">
                 <img
                   src={celebrationMatch.backdrop}
                   alt={celebrationMatch.title}
@@ -388,7 +412,7 @@ export default function SwipeScreen({
                 <h3 className="text-2xl font-black font-display tracking-tight text-[#e3e0f1] px-2">
                   {celebrationMatch.title}
                 </h3>
-                <p className="text-[#ffe16d] text-xs font-sans font-extrabold flex items-center justify-center gap-1.5 mt-1">
+                <p className="text-[#ffe16d] text-xs font-sans font-extrabold flex items-center justify-center gap-1.5 mt-1 select-none">
                   <span>Uitgebracht in {celebrationMatch.year}</span>
                   <span className="text-[#ffdb3c]">★ {celebrationMatch.rating}</span>
                 </p>
@@ -398,7 +422,7 @@ export default function SwipeScreen({
                 "{celebrationMatch.synopsis}"
               </p>
 
-              <div className="flex flex-col items-center gap-2">
+              <div className="flex flex-col items-center gap-2 select-none">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">
                   Te zien op jouw diensten:
                 </span>
@@ -421,7 +445,8 @@ export default function SwipeScreen({
                     href={celebrationMatch.trailerUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="w-full py-3 px-4 rounded-full bg-red-655 hover:bg-gradient-to-br hover:from-red-600 hover:to-red-700 text-white font-extrabold flex items-center justify-center gap-2 hover:text-white transition-all cursor-pointer shadow-md active:scale-95 text-xs uppercase tracking-widest"
+                    className="w-full py-3 px-4 rounded-full bg-red-655 hover:bg-gradient-to-br hover:from-red-600 hover:to-red-700 text-white font-extrabold flex items-center justify-center gap-2 hover:text-white transition-all cursor-pointer shadow-md active:scale-95 text-xs uppercase tracking-widest focus-visible:ring-2 focus-visible:ring-red-500 focus:outline-none"
+                    aria-label={`Bekijk trailer van ${celebrationMatch.title}`}
                   >
                     <Play className="w-3.5 h-3.5 fill-white text-white shrink-0" />
                     Bekijk Trailer
@@ -431,7 +456,8 @@ export default function SwipeScreen({
                   id="close-match-celebration-btn"
                   type="button"
                   onClick={() => setCelebrationMatch(null)}
-                  className="w-full py-3 px-4 rounded-full glow-button text-white font-extrabold tracking-wide shadow-md active:scale-95 transition-all cursor-pointer text-xs uppercase tracking-widest"
+                  className="w-full py-3 px-4 rounded-full glow-button text-white font-extrabold tracking-wide shadow-md active:scale-95 transition-all cursor-pointer text-xs uppercase tracking-widest focus-visible:ring-2 focus-visible:ring-[#ff5637] focus:outline-none"
+                  aria-label="Sluit viering en ga door met swipen"
                 >
                   Verder Swipen!
                 </button>
@@ -446,21 +472,34 @@ export default function SwipeScreen({
 }
 
 interface CinephileCardProps {
-  key?: string | number;
   movie: Movie;
   onSwipe: (movieId: string, liked: boolean) => void;
   swipeDirection: "like" | "dislike" | null;
   setSwipeDirection: (direction: "like" | "dislike" | null) => void;
 }
 
-function CinephileCard({ movie, onSwipe, swipeDirection, setSwipeDirection }: CinephileCardProps) {
+// 1. Memoize CinephileCard with React.memo to avoid redundant heavy re-renders in card stack
+const CinephileCard = memo(function CinephileCard({
+  movie,
+  onSwipe,
+  swipeDirection,
+  setSwipeDirection,
+}: CinephileCardProps) {
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-25, 25]);
   const opacity = useTransform(x, [-200, -150, 0, 150, 200], [0.5, 1, 1, 1, 0.5]);
 
+  // Expandable plot text toggle for longer synopses
+  const [synopsisExpanded, setSynopsisExpanded] = useState(false);
+
   // Stamp overlay opacities
   const likeOpacity = useTransform(x, [0, 100], [0, 1]);
   const nopeOpacity = useTransform(x, [-100, 0], [1, 0]);
+
+  // Reset expanded state if movie changes
+  useEffect(() => {
+    setSynopsisExpanded(false);
+  }, [movie.id]);
 
   return (
     <motion.div
@@ -478,7 +517,12 @@ function CinephileCard({ movie, onSwipe, swipeDirection, setSwipeDirection }: Ci
       drag="x"
       dragConstraints={{ left: 0, right: 0 }}
       dragElastic={0.7}
-      style={{ x, rotate, opacity }}
+      style={{
+        x,
+        rotate,
+        opacity,
+        willChange: "transform" // 4. Hardware acceleration to prevent mobile/safari jittering
+      }}
       onDragEnd={(event, info) => {
         const swipeThreshold = 130;
         if (info.offset.x > swipeThreshold) {
@@ -514,63 +558,83 @@ function CinephileCard({ movie, onSwipe, swipeDirection, setSwipeDirection }: Ci
         NEE BEDANKT
       </motion.div>
 
-      <div className="absolute inset-0 p-6 md:p-8 flex flex-col justify-end z-10 pointer-events-none">
-        <div className="flex items-center gap-2 mb-3">
+      <div className="absolute inset-0 p-4 sm:p-6 md:p-8 flex flex-col justify-end z-10 pointer-events-none">
+        <div className="flex flex-wrap items-center gap-1.5 mb-2.5 sm:mb-3">
           {movie.genres.slice(0, 3).map((g, idx) => (
             <span
               key={idx}
-              className="px-3 py-1 bg-[#ff5637]/15 border border-[#ff5637]/30 text-[#ffb4a5] text-[10px] font-bold uppercase tracking-wider rounded-full select-none"
+              className="px-2.5 py-0.5 bg-[#ff5637]/15 border border-[#ff5637]/30 text-[#ffb4a5] text-[9.5px] font-bold uppercase tracking-wider rounded-full select-none"
             >
               {g}
             </span>
           ))}
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-1.5 flex-wrap">
             {movie.trailerUrl && (
               <a
                 id="movie-trailer-link"
                 href={movie.trailerUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="pointer-events-auto flex items-center gap-1 bg-gradient-to-r from-red-655 to-red-600 hover:from-red-500 hover:to-red-600 border border-red-500/25 px-2.5 py-1.5 text-[9px] font-extrabold text-white uppercase tracking-widest rounded-full shrink-0 cursor-pointer shadow-md transition-all active:scale-95 hover:scale-105"
+                className="pointer-events-auto flex items-center gap-1 bg-gradient-to-r from-red-655 to-red-600 hover:from-red-500 hover:to-red-600 border border-red-500/25 px-2 py-1 text-[8.5px] font-extrabold text-white uppercase tracking-widest rounded-full shrink-0 cursor-pointer shadow-md transition-all active:scale-95 hover:scale-105 focus-visible:ring-2 focus-visible:ring-red-550 focus:outline-none"
                 title="Bekijk de trailer op YouTube"
+                aria-label={`Bekijk trailer van ${movie.title}`}
               >
-                <Play className="w-2.5 h-2.5 fill-white text-white shrink-0" />
+                <Play className="w-2 h-2 fill-white text-white shrink-0" />
                 Trailer
               </a>
             )}
-            <div className="flex items-center gap-1 bg-black/60 backdrop-blur-md border border-white/5 px-2.5 py-1.5 rounded-full">
-              <Star className="w-3.5 h-3.5 text-[#ffdb3c] fill-[#ffdb3c] shrink-0" />
-              <span className="text-xs font-bold text-[#ffdb3c]">{movie.rating}</span>
+            <div className="flex items-center gap-1 bg-black/60 backdrop-blur-md border border-white/5 px-2 py-1 rounded-full">
+              <Star className="w-3 h-3 text-[#ffdb3c] fill-[#ffdb3c] shrink-0" />
+              <span className="text-[11px] font-bold text-[#ffdb3c]">{movie.rating}</span>
             </div>
           </div>
         </div>
 
-        <h2 className="text-3xl md:text-4xl font-black text-white mb-2 leading-tight tracking-tight drop-shadow-md font-display">
+        <h2 className="text-xl min-[400px]:text-2xl sm:text-3xl font-black text-white mb-2 leading-tight tracking-tight drop-shadow-md font-display line-clamp-2 select-text pointer-events-auto">
           {movie.title}
         </h2>
 
-        <p className="text-slate-300 text-xs md:text-sm line-clamp-2 italic mb-4 font-sans leading-relaxed">
-          "{movie.synopsis}"
-        </p>
+        {/* 3. Expandable plot synopsis text for mobile comfort / long summaries */}
+        <div className="pointer-events-auto mb-4 select-text">
+          <p 
+            onClick={() => setSynopsisExpanded(!synopsisExpanded)}
+            className={`text-slate-200 text-xs md:text-sm italic cursor-pointer transition-all hover:text-white leading-relaxed ${
+              synopsisExpanded ? "line-clamp-none max-h-[120px] overflow-y-auto custom-scrollbar pr-1" : "line-clamp-2"
+            }`}
+          >
+            "{movie.synopsis}"
+          </p>
+          {movie.synopsis && movie.synopsis.length > 100 && (
+            <button
+              onClick={() => setSynopsisExpanded(!synopsisExpanded)}
+              className="text-[10px] text-[#ffdb3c] font-black mt-1 uppercase hover:underline focus-visible:ring-1 focus-visible:ring-[#ff5637] transition-all focus:outline-none cursor-pointer"
+              aria-label={synopsisExpanded ? "Toon kortere synopsis" : "Toon volledige synopsis"}
+            >
+              {synopsisExpanded ? "Minder tonen ▲" : "Lees meer ▼"}
+            </button>
+          )}
+        </div>
 
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1.5 flex-wrap text-xs font-semibold text-slate-300">
-            <span className="px-1.5 py-0.5 bg-[#8c7fff]/15 border border-[#8c7fff]/25 text-[#cec9ff] text-[9px] font-extrabold rounded tracking-wider shrink-0 select-none">
+        <div className="flex items-center justify-between gap-3 mt-1 sm:mt-1.5 pointer-events-auto">
+          <div className="flex items-center gap-1.5 flex-wrap text-xs font-semibold text-slate-350 min-w-0">
+            <span className="px-1.5 py-0.5 bg-[#8c7fff]/15 border border-[#8c7fff]/25 text-[#cec9ff] text-[8.5px] font-extrabold rounded tracking-wider shrink-0 select-none">
               STREAM
             </span>
-            {movie.providers.map((p, pIdx) => (
-              <div key={pIdx} className="w-12 h-8 overflow-hidden rounded-xl shrink-0 select-none shadow">
-                <ProviderLogo id={p} active={true} size={14} />
-              </div>
-            ))}
+            <div className="flex flex-wrap gap-1.5 items-center">
+              {movie.providers.map((p, pIdx) => (
+                <div key={pIdx} className="w-10 h-6.5 sm:w-12 sm:h-8 overflow-hidden rounded-lg shrink-0 select-none shadow border border-white/5">
+                  <ProviderLogo id={p} active={true} size={12} />
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="ml-auto flex items-center gap-1.5 shrink-0 select-none">
+          <div className="flex items-center gap-1.5 shrink-0 select-none ml-2">
             {movie.language && (
-              <span className="px-2 py-0.5 bg-slate-900 border border-white/5 text-slate-300 text-[10px] rounded-md font-sans font-semibold tracking-wide">
+              <span className="px-1.5 py-0.5 bg-slate-900 border border-white/5 text-slate-350 text-[9px] rounded font-sans font-semibold tracking-wide uppercase">
                 {movie.language}
               </span>
             )}
-            <span className="px-2 py-0.5 bg-slate-900 border border-white/5 text-slate-400 text-[10px] rounded-md font-mono font-bold">
+            <span className="px-1.5 py-0.5 bg-slate-900 border border-white/5 text-slate-400 text-[9px] rounded font-mono font-bold">
               {movie.year}
             </span>
           </div>
@@ -578,25 +642,4 @@ function CinephileCard({ movie, onSwipe, swipeDirection, setSwipeDirection }: Ci
       </div>
     </motion.div>
   );
-}
-
-function Tv(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="1em"
-      height="1.5em"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      {...props}
-    >
-      <rect width="20" height="15" x="2" y="7" rx="2" ry="2" />
-      <path d="m17 2-5 5-5-5" />
-    </svg>
-  );
-}
-
+});

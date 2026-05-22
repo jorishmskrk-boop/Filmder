@@ -47,3 +47,30 @@ body {
               radial-gradient(circle at 80% 80%, rgba(140, 127, 255, 0.1) 0%, transparent 40%);
 }
 
+/* Custom polished scrollbar to match the futuristic/dark cinema theme */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 86, 55, 0.35) rgba(0, 0, 0, 0.2);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(18, 18, 29, 0.6);
+  border-radius: 999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 86, 55, 0.4);
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 86, 55, 0.65);
+}
+
+

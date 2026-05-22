@@ -22,6 +22,14 @@ export interface Room {
   swipes: Record<string, Record<string, boolean>>; // Maps uid -> movie_id -> boolean (liked)
   matches: Movie[];
   reactions: Record<string, { emoji: string; timestamp: number }>; // Maps uid -> reaction details
+  maxRuntime?: number;
+  minRuntime?: number;
+  minRating?: number;
+  maxRating?: number;
+  releaseDecade?: string;
+  minYear?: number;
+  maxYear?: number;
+  ageRating?: boolean;
 }
 
 export interface Preferences {
@@ -29,5 +37,12 @@ export interface Preferences {
   country: string;
   providers: string[];
   vibe: string;
-  tmdbApiKey: string;
+  maxRuntime?: number;
+  minRuntime?: number;
+  minRating?: number;
+  maxRating?: number;
+  releaseDecade?: string;
+  minYear?: number;
+  maxYear?: number;
+  ageRating?: boolean;
 }

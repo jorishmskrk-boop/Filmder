@@ -1,12 +1,22 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, doc, persistentMultipleTabManager } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId); /* CRITICAL: The app will break without this line */
+
+// Initialize Firestore with modern local caching configuration (fully replacing deprecated enableIndexedDbPersistence)
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager()
+  })
+}, firebaseConfig.firestoreDatabaseId); /* CRITICAL: The app will break without this line */
+
 export const auth = getAuth();
+
+// Helper function to resolve room document path
+export const getRoomRef = (code: string) => doc(db, 'artifacts', 'flixmatch-default-id', 'public', 'data', 'rooms', code);
 
 export enum OperationType {
   CREATE = 'create',
@@ -14,6 +24,7 @@ export enum OperationType {
   DELETE = 'delete',
   LIST = 'list',
   GET = 'get',
+  DATABASE_GET = 'get', // Keep both for safety
   WRITE = 'write',
 }
 

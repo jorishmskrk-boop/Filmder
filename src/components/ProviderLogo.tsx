@@ -108,6 +108,12 @@ const BRAND_DETAILS: Record<string, {
     bgInactive: "bg-slate-950/25",
     textColorActive: "text-[#EC008C]",
     textColorInactive: "text-slate-600"
+  },
+  pirate: {
+    bgActive: "bg-amber-950/40 border border-[#ffbf3e]/40",
+    bgInactive: "bg-slate-950/25",
+    textColorActive: "text-[#ffbf3e] font-black",
+    textColorInactive: "text-slate-600"
   }
 };
 
@@ -188,7 +194,48 @@ export default function ProviderLogo({ id, active = true, size = 18, className =
               v|deo
             </span>
           )}
-          {!["hulu", "paramount", "videoland"].includes(normalizedId) && (
+          {normalizedId === "pirate" && (
+            <div className={`flex flex-col items-center justify-center leading-none ${active ? "animate-pulse-slow" : ""}`}>
+              <svg
+                viewBox="0 0 64 64"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={active ? "text-[#ffbf3e] drop-shadow-[0_2px_12px_rgba(255,191,62,0.45)]" : "text-slate-500"}
+                style={{ width: size + 8, height: size + 8 }}
+              >
+                {/* Bowsprit / rigging lines at the front */}
+                <path d="M8,34 L21,38" strokeWidth="1.5" />
+                <path d="M14,35 C17,31 19,25 21,21" strokeWidth="1" />
+                
+                {/* Fore mast sails (billowing leftwards/backwards) */}
+                <path d="M22,18 C15,21 15,29 22,31" fill="currentColor" fillOpacity={active ? "0.2" : "0"} strokeWidth="1.5" />
+                <path d="M22,29 C16,31 16,36 22,38" fill="currentColor" fillOpacity={active ? "0.2" : "0"} strokeWidth="1.5" />
+                
+                {/* Main mast (center) with iconic large billowing sails */}
+                <path d="M36,7 C26,11 26,23 36,25" fill="currentColor" fillOpacity={active ? "0.35" : "0"} strokeWidth="2.5" />
+                <path d="M36,23 C26,25 26,34 36,36" fill="currentColor" fillOpacity={active ? "0.35" : "0"} strokeWidth="2.5" />
+                <line x1="36" y1="7" x2="36" y2="40" strokeWidth="2.5" />
+                <line x1="22" y1="18" x2="22" y2="40" strokeWidth="1.5" />
+
+                {/* Mizzen mast (back) sail */}
+                <path d="M49,19 C42,22 42,32 49,34" fill="currentColor" fillOpacity={active ? "0.2" : "0"} strokeWidth="1.5" />
+                <line x1="49" y1="19" x2="49" y2="40" strokeWidth="1.5" />
+
+                {/* Classical Galleon wooden Hull with curved high bow and curved high stern */}
+                <path d="M13,38 C19,45 43,45 53,38 C55,35 56,29 56,29 C46,32 19,32 13,31 C10,31 11,35 13,38 Z" fill="currentColor" strokeWidth="1.8" />
+
+                {/* Splashing waves directly under the pirate ship */}
+                <path d="M5,44 C11,46 17,42 23,44 C29,46 35,42 41,44 C47,46 53,42 59,44" strokeWidth="2.5" />
+                
+                {/* Pirate Flag flying on top of the main mast */}
+                <path d="M36,7 L43,9 L36,11" fill="currentColor" strokeWidth="1" />
+              </svg>
+            </div>
+          )}
+          {!["hulu", "paramount", "videoland", "pirate"].includes(normalizedId) && (
             <span className={`text-[10px] uppercase font-bold tracking-wider ${active ? brand.textColorActive : brand.textColorInactive}`}>
               {id}
             </span>

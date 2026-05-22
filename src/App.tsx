@@ -1,34 +1,40 @@
 import { useState, useEffect } from "react";
 import { signInAnonymously, onAuthStateChanged, User } from "firebase/auth";
-import { doc, setDoc, updateDoc, getDoc, onSnapshot, arrayUnion } from "firebase/firestore";
-import { db, auth, OperationType, handleFirestoreError } from "./firebase";
+import { setDoc, updateDoc, getDoc, arrayUnion } from "firebase/firestore";
+import { auth, OperationType, handleFirestoreError, getRoomRef } from "./firebase";
 import { Movie, Room, Preferences } from "./types";
+import { useRoomSession } from "./hooks/useRoomSession";
 import LandingScreen from "./components/LandingScreen";
 import LobbyScreen from "./components/LobbyScreen";
 import SwipeScreen from "./components/SwipeScreen";
 import MatchesScreen from "./components/MatchesScreen";
 import FilmFlameLogo from "./components/FilmFlameLogo";
-import { Sparkles, MessageCircle, Tv, Heart, Users, Award, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
+import toast, { Toaster } from "react-hot-toast";
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Match session state
-  const [roomCode, setRoomCode] = useState<string | null>(null);
-  const [room, setRoom] = useState<Room | null>(null);
-  const [swipingStarted, setSwipingStarted] = useState(false);
-  const [activeTab, setActiveTab] = useState<"swipe" | "matches">("swipe");
+  // Dynamic shared room code scanned from url
   const [sharedRoomCode, setSharedRoomCode] = useState<string | null>(null);
 
-  // Local state for notifications
-  const [notification, setNotification] = useState<string | null>(null);
-
-  // Auto loading batch states
+  // Auto loading batch state-lock
   const [isAutoLoadingBatch, setIsAutoLoadingBatch] = useState(false);
 
-  // 1. Initialize Firebase Anonymous authentication on component mount
+  // 1. Hook up the custom room session to handle room state, subscription and tabs
+  const {
+    roomCode,
+    setRoomCode,
+    room,
+    swipingStarted,
+    setSwipingStarted,
+    activeTab,
+    setActiveTab,
+  } = useRoomSession(user, setErrorMsg);
+
+  // 2. Initialize Firebase Anonymous authentication on component mount
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
@@ -41,6 +47,7 @@ export default function App() {
         } catch (err) {
           console.error("Firebase Anonymous login error:", err);
           setErrorMsg("Anonieme Firebase-authenticatie met de cloudserver is mislukt.");
+          toast.error("Firebase-authenticatie is mislukt.");
         } finally {
           setLoading(false);
         }
@@ -50,58 +57,20 @@ export default function App() {
     return () => unsubscribeAuth();
   }, []);
 
-  // 2. Scan and pre-populate room code if shared in the URL search params (?room=1234)
+  // 3. Scan and pre-populate room code if shared in the URL search params (?room=1234)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const sharedRoom = params.get("room");
     if (sharedRoom && sharedRoom.length === 4) {
       const upperCode = sharedRoom.toUpperCase();
       setSharedRoomCode(upperCode);
-      // Prompt notification
-      setNotification(`Gedeelde lobby-uitnodigingscode gevonden: ${upperCode}. Vul je naam in om deel te nemen!`);
+      toast.success(`Uitnodiging gevonden voor lobby: ${upperCode}! Vul je naam in om deel te nemen.`, {
+        duration: 6000,
+      });
     }
   }, []);
 
-  // 3. Keep real-time snapshot database subscription synced with roomCode changes
-  useEffect(() => {
-    if (!roomCode) {
-      setRoom(null);
-      return;
-    }
-
-    const docPath = `artifacts/flixmatch-default-id/public/data/rooms/${roomCode}`;
-    const roomDocRef = doc(db, "artifacts", "flixmatch-default-id", "public", "data", "rooms", roomCode);
-
-    const unsubscribeRoom = onSnapshot(
-      roomDocRef,
-      (snapshot) => {
-        if (snapshot.exists()) {
-          const data = snapshot.data();
-          setRoom(data as Room);
-        } else {
-          // If room doesn't exist anymore or isn't loaded
-          setRoomCode(null);
-          setRoom(null);
-          setErrorMsg("De ingevoerde lobby-code is niet gevonden of verlopen.");
-        }
-      },
-      (err) => {
-        handleFirestoreError(err, OperationType.GET, docPath);
-      }
-    );
-
-    return () => unsubscribeRoom();
-  }, [roomCode]);
-
-  // Helper trigger to fade notifications
-  useEffect(() => {
-    if (notification) {
-      const timer = setTimeout(() => setNotification(null), 6000);
-      return () => clearTimeout(timer);
-    }
-  }, [notification]);
-
-  // Automatically load a completely new, fresh batch of movies when both are done and no matches are found
+  // 4. Automatically load a completely new, fresh batch of movies when both are done and no matches are found
   useEffect(() => {
     if (!roomCode || !room || !user || isAutoLoadingBatch) return;
     
@@ -126,17 +95,23 @@ export default function App() {
 
         try {
           const docPath = `artifacts/flixmatch-default-id/public/data/rooms/${roomCode}`;
-          const roomDocRef = doc(db, "artifacts", "flixmatch-default-id", "public", "data", "rooms", roomCode);
-          const savedKey = localStorage.getItem("flixmatch_tmdb_key") || "";
+          const roomDocRef = getRoomRef(roomCode);
 
           const res = await fetch("/api/movies", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              apiKey: savedKey,
               country: room.country || "NL",
               providers: room.providers || ["netflix"],
               vibe: room.vibe || "",
+              maxRuntime: room.maxRuntime,
+              minRuntime: room.minRuntime,
+              minRating: room.minRating,
+              maxRating: room.maxRating,
+              releaseDecade: room.releaseDecade,
+              minYear: room.minYear,
+              maxYear: room.maxYear,
+              ageRating: room.ageRating,
             }),
           });
 
@@ -159,10 +134,11 @@ export default function App() {
               matches: [],
             });
 
-            setNotification("Niemand vond de vorige films leuk... Er is automatisch een gloednieuwe stapel films geladen!");
+            toast.success("Niemand vond de vorige films leuk... Er is automatisch een nieuwe stapel films geladen!");
           }
         } catch (err) {
           console.error("Fout bij het automatisch ophalen van een nieuwe batch:", err);
+          toast.error("Automatisch ophalen van een nieuwe filmstapel is mislukt.");
         } finally {
           setIsAutoLoadingBatch(false);
           setLoading(false);
@@ -185,19 +161,41 @@ export default function App() {
     setErrorMsg(null);
 
     try {
-      const code = generate4DigitCode();
-      const docPath = `artifacts/flixmatch-default-id/public/data/rooms/${code}`;
-      const roomDocRef = doc(db, "artifacts", "flixmatch-default-id", "public", "data", "rooms", code);
+      // Generate code and verify with Firestore that it is truly unused, loop until we find one
+      let code = generate4DigitCode();
+      let roomDocRef = getRoomRef(code);
+      let isUnused = false;
+      let attempts = 0;
 
-      // Call API server-side route to fetch movies (using TMDB key if provided, fallback to Gemini)
+      while (!isUnused && attempts < 15) {
+        const docSnap = await getDoc(roomDocRef);
+        if (!docSnap.exists()) {
+          isUnused = true;
+        } else {
+          code = generate4DigitCode();
+          roomDocRef = getRoomRef(code);
+          attempts++;
+        }
+      }
+
+      const docPath = `artifacts/flixmatch-default-id/public/data/rooms/${code}`;
+
+      // Call API server-side route to fetch movies using server key ONLY
       const res = await fetch("/api/movies", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          apiKey: prefs.tmdbApiKey,
           country: prefs.country,
           providers: prefs.providers,
           vibe: prefs.vibe,
+          maxRuntime: prefs.maxRuntime,
+          minRuntime: prefs.minRuntime,
+          minRating: prefs.minRating,
+          maxRating: prefs.maxRating,
+          releaseDecade: prefs.releaseDecade,
+          minYear: prefs.minYear,
+          maxYear: prefs.maxYear,
+          ageRating: prefs.ageRating,
         }),
       });
 
@@ -230,6 +228,15 @@ export default function App() {
         reactions: {},
       };
 
+      if (prefs.maxRuntime !== undefined) roomPayload.maxRuntime = prefs.maxRuntime;
+      if (prefs.minRuntime !== undefined) roomPayload.minRuntime = prefs.minRuntime;
+      if (prefs.minRating !== undefined) roomPayload.minRating = prefs.minRating;
+      if (prefs.maxRating !== undefined) roomPayload.maxRating = prefs.maxRating;
+      if (prefs.releaseDecade !== undefined) roomPayload.releaseDecade = prefs.releaseDecade;
+      if (prefs.minYear !== undefined) roomPayload.minYear = prefs.minYear;
+      if (prefs.maxYear !== undefined) roomPayload.maxYear = prefs.maxYear;
+      if (prefs.ageRating !== undefined) roomPayload.ageRating = prefs.ageRating;
+
       try {
         await setDoc(roomDocRef, roomPayload);
       } catch (err: any) {
@@ -239,9 +246,11 @@ export default function App() {
       setRoomCode(code);
       setSwipingStarted(false);
       setActiveTab("swipe");
+      toast.success("Lobby succesvol aangemaakt!");
     } catch (err: any) {
       console.error("Error creating matching room:", err);
       setErrorMsg(err.message || "Er is een fout opgetreden bij het opzetten van de lobby.");
+      toast.error(err.message || "Lobby maken is mislukt.");
     } finally {
       setLoading(false);
     }
@@ -255,7 +264,7 @@ export default function App() {
 
     try {
       const docPath = `artifacts/flixmatch-default-id/public/data/rooms/${code}`;
-      const roomDocRef = doc(db, "artifacts", "flixmatch-default-id", "public", "data", "rooms", code);
+      const roomDocRef = getRoomRef(code);
       let roomSnap;
       try {
         roomSnap = await getDoc(roomDocRef);
@@ -263,7 +272,7 @@ export default function App() {
         handleFirestoreError(err, OperationType.GET, docPath);
       }
 
-      if (!roomSnap.exists()) {
+      if (!roomSnap || !roomSnap.exists()) {
         throw new Error(`Er bestaat geen lobby met code ${code}. Controleer de code en probeer het opnieuw!`);
       }
 
@@ -283,9 +292,11 @@ export default function App() {
 
       // Set URL search parameter cleanly without reloading the page
       window.history.replaceState({}, "", `?room=${code}`);
+      toast.success(`Succesvol verbonden met lobby ${code}!`);
     } catch (err: any) {
       console.error("Error joining matching room:", err);
       setErrorMsg(err.message || "Er is een fout opgetreden bij het deelnemen aan de lobby.");
+      toast.error(err.message || "Deelnemen mislukt.");
     } finally {
       setLoading(false);
     }
@@ -296,7 +307,7 @@ export default function App() {
     if (!user || !roomCode || !room) return;
 
     const docPath = `artifacts/flixmatch-default-id/public/data/rooms/${roomCode}`;
-    const roomDocRef = doc(db, "artifacts", "flixmatch-default-id", "public", "data", "rooms", roomCode);
+    const roomDocRef = getRoomRef(roomCode);
 
     try {
       // Save swipe instantly to Firestore
@@ -316,19 +327,22 @@ export default function App() {
         if (partnerId) {
           const partnerSwipes = room.swipes?.[partnerId] || {};
           if (partnerSwipes[movieId] === true) {
-            // Find movie object
-            const matchedMovieObj = room.movies.find((m) => m.id === movieId);
-            if (matchedMovieObj) {
-              // Ensure we do not add duplicate matches
-              const alreadyMatched = (room.matches || []).some((m) => m.id === movieId);
-              if (!alreadyMatched) {
-                try {
-                  await updateDoc(roomDocRef, {
-                    matches: arrayUnion(matchedMovieObj),
-                  });
-                } catch (err: any) {
-                  handleFirestoreError(err, OperationType.WRITE, docPath);
-                }
+            // Ensure we do not add duplicate matches
+            // Support checking against either structured Movie objects or raw ID strings
+            const alreadyMatched = (room.matches || []).some((m) => {
+              const matchedId = typeof m === "string" ? m : m.id;
+              return matchedId === movieId;
+            });
+
+            if (!alreadyMatched) {
+              try {
+                // Write EXCLUSIVELY the movieId string instead of full object for DB optimization
+                await updateDoc(roomDocRef, {
+                  matches: arrayUnion(movieId),
+                });
+                toast.success("Match gevonden! 🎉", { icon: "🔥" });
+              } catch (err: any) {
+                handleFirestoreError(err, OperationType.WRITE, docPath);
               }
             }
           }
@@ -344,7 +358,7 @@ export default function App() {
     if (!user || !roomCode) return;
 
     const docPath = `artifacts/flixmatch-default-id/public/data/rooms/${roomCode}`;
-    const roomDocRef = doc(db, "artifacts", "flixmatch-default-id", "public", "data", "rooms", roomCode);
+    const roomDocRef = getRoomRef(roomCode);
 
     try {
       await updateDoc(roomDocRef, {
@@ -367,7 +381,7 @@ export default function App() {
     if (!roomCode || !room) return;
 
     const docPath = `artifacts/flixmatch-default-id/public/data/rooms/${roomCode}`;
-    const roomDocRef = doc(db, "artifacts", "flixmatch-default-id", "public", "data", "rooms", roomCode);
+    const roomDocRef = getRoomRef(roomCode);
 
     try {
       // Rebuild clean swipes structure for connected room users
@@ -385,7 +399,7 @@ export default function App() {
         handleFirestoreError(err, OperationType.WRITE, docPath);
       }
 
-      setNotification("De filmstapel is succesvol herladen en alle geselecteerde swipes zijn hersteld.");
+      toast.success("Alle swipes hersteld!");
     } catch (err) {
       console.error("Error resetting cinephile deck:", err);
     }
@@ -398,17 +412,19 @@ export default function App() {
 
     try {
       const docPath = `artifacts/flixmatch-default-id/public/data/rooms/${roomCode}`;
-      const roomDocRef = doc(db, "artifacts", "flixmatch-default-id", "public", "data", "rooms", roomCode);
-      const savedKey = localStorage.getItem("flixmatch_tmdb_key") || "";
+      const roomDocRef = getRoomRef(roomCode);
 
       const res = await fetch("/api/movies", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          apiKey: savedKey,
           country: room.country || "NL",
           providers: room.providers || ["netflix"],
           vibe: room.vibe || "",
+          maxRuntime: room.maxRuntime,
+          minRating: room.minRating,
+          releaseDecade: room.releaseDecade,
+          ageRating: room.ageRating,
         }),
       });
 
@@ -431,13 +447,14 @@ export default function App() {
           matches: [],
         });
 
-        setNotification("Er is succesvol een gloednieuwe stapel films geladen!");
+        toast.success("Er is een gloednieuwe stapel films geladen!");
       } else {
         throw new Error("Geen geschikte films gevonden voor de nieuwe instellingen.");
       }
     } catch (err: any) {
       console.error("Fout handmatig ophalen van nieuwe batch:", err);
       setErrorMsg(err.message || "Er is een fout opgetreden bij het laden van een nieuwe filmstapel.");
+      toast.error("Nieuwe batch laden is mislukt.");
     } finally {
       setLoading(false);
     }
@@ -448,25 +465,43 @@ export default function App() {
     setSwipingStarted(false);
     // Clear room query params
     window.history.replaceState({}, "", window.location.pathname);
+    toast("Lobby verlaten.");
   };
 
   return (
     <div className="min-h-screen bg-[#12121d] text-[#e3e0f1] font-sans flex flex-col justify-between relative overflow-hidden bg-gradient-mesh">
+      {/* Global Toast Elements Configuration Container */}
+      <Toaster 
+        position="top-center" 
+        reverseOrder={false}
+        toastOptions={{
+          style: {
+            background: "#1c1c28",
+            color: "#e3e0f1",
+            border: "1px solid rgba(255, 255, 255, 0.08)",
+            borderRadius: "1rem",
+            fontSize: "0.85rem",
+          }
+        }}
+      />
+
       {/* Background Cosmic Atmospheric Glows */}
       <div className="absolute top-[-100px] left-[-100px] w-[500px] h-[500px] bg-[#ff5637]/8 rounded-full blur-[150px] pointer-events-none"></div>
       <div className="absolute bottom-[-100px] right-[-100px] w-[500px] h-[500px] bg-[#8c7fff]/8 rounded-full blur-[150px] pointer-events-none"></div>
       
       {/* Top Main Navigation Header bar */}
-      <header className="h-20 px-6 sm:px-8 flex items-center justify-between border-b border-white/5 relative z-20 bg-[#12121d]/85 backdrop-blur-xl sticky top-0">
-        <div className="flex items-center gap-3">
-          <FilmFlameLogo size={42} className="hover:scale-110 active:scale-95 transition-transform duration-200 cursor-pointer" />
-          <h1 className="text-3xl font-extrabold tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-white via-[#ffb4a5] to-[#ff5637] font-display select-none">
+      <header className="h-16 sm:h-20 px-3 sm:px-8 flex items-center justify-between border-b border-white/5 relative z-20 bg-[#12121d]/85 backdrop-blur-xl sticky top-0 transition-all select-none">
+        <div className="flex items-center gap-1.5 sm:gap-3">
+          <FilmFlameLogo size={32} className="sm:size-[42px] hover:scale-110 active:scale-95 transition-transform duration-200 cursor-pointer shrink-0" />
+          <h1 className={`text-xl sm:text-3xl font-extrabold tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-white via-[#ffb4a5] to-[#ff5637] font-display select-none transition-all ${
+            roomCode ? "hidden min-[380px]:block" : "block"
+          }`}>
             Filmder
           </h1>
         </div>
 
         {roomCode && room && (
-          <div className="flex items-center gap-4 sm:gap-6 relative z-30">
+          <div className="flex items-center gap-2 sm:gap-6 relative z-30">
             {/* Room code badge */}
             <div className="hidden sm:flex items-center gap-2 bg-[#1b1a26] border border-white/5 px-4 py-2 rounded-full shadow-inner">
               <span className="w-2 h-2 bg-[#ff5637] rounded-full animate-pulse"></span>
@@ -476,14 +511,14 @@ export default function App() {
             </div>
 
             {/* Overlapping player avatar roundels */}
-            <div className="flex -space-x-2">
+            <div className="flex -space-x-1.5 shrink-0">
               {Object.entries(room.users || {}).map(([uid, name]) => {
                 const isMe = uid === user?.uid;
                 const displayName = String(name || "User");
                 return (
                   <div
                     key={uid}
-                    className={`w-9 h-9 rounded-full border-2 border-[#12121d] flex items-center justify-center text-xs font-black shadow-lg uppercase font-display select-none transition-transform hover:scale-115 ${
+                    className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full border-2 border-[#12121d] flex items-center justify-center text-[10px] sm:text-xs font-black shadow-lg uppercase font-display select-none transition-transform hover:scale-115 shrink-0 ${
                       isMe ? "bg-gradient-to-br from-[#ff5637] to-[#ba1c00] text-white" : "bg-slate-800 text-[#e3e0f1]"
                     }`}
                     title={displayName}
@@ -495,11 +530,11 @@ export default function App() {
             </div>
 
             {swipingStarted && (
-              <div className="flex items-center bg-[#0d0d18] border border-white/5 rounded-2xl p-1 shrink-0 shadow-md">
+              <div className="flex items-center bg-[#0d0d18] border border-white/5 rounded-2xl p-0.5 sm:p-1 shrink-0 shadow-md">
                 <button
                   id="tab-swipe-arena"
                   onClick={() => setActiveTab("swipe")}
-                  className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  className={`px-3 sm:px-4 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer ${
                     activeTab === "swipe"
                       ? "bg-[#ff5637]/15 text-[#ffb4a5] border border-[#ff5637]/20 shadow-sm"
                       : "text-slate-400 hover:text-white"
@@ -510,7 +545,7 @@ export default function App() {
                 <button
                   id="tab-watchlist"
                   onClick={() => setActiveTab("matches")}
-                  className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all relative cursor-pointer ${
+                  className={`px-3 sm:px-4 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all relative cursor-pointer ${
                     activeTab === "matches"
                       ? "bg-[#ff5637]/15 text-[#ffb4a5] border border-[#ff5637]/20 shadow-sm"
                       : "text-slate-400 hover:text-white"
@@ -518,7 +553,7 @@ export default function App() {
                 >
                   Matches
                   {(room.matches || []).length > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#ff5637] px-1 text-[8px] font-black text-white border-2 border-[#12121d] animate-pulse shadow-md">
+                    <span className="absolute -top-1 -right-1 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-[#ff5637] px-1 text-[7px] font-black text-white border-2 border-[#12121d] animate-pulse shadow-md">
                       {(room.matches || []).length}
                     </span>
                   )}
@@ -527,10 +562,10 @@ export default function App() {
             )}
 
             <button
-              id="leave-lobby-header-btn"
-              onClick={handleLeaveLobby}
-              className="p-2 text-slate-500 hover:text-[#ff5637] transition-all hover:scale-110 cursor-pointer"
-              title="Lobby verlaat"
+               id="leave-lobby-header-btn"
+               onClick={handleLeaveLobby}
+               className="p-2 text-slate-500 hover:text-[#ff5637] transition-all hover:scale-110 cursor-pointer"
+               title="Lobby verlaten"
             >
               <LogOut className="w-4 h-4" />
             </button>
@@ -555,13 +590,6 @@ export default function App() {
         {!loading && errorMsg && (
           <div className="max-w-md mx-auto mb-6 bg-red-500/10 border border-red-500/20 rounded-2xl p-4 text-red-400 text-xs text-center font-bold leading-relaxed shadow-xl">
             {errorMsg}
-          </div>
-        )}
-
-        {/* Toast Notification message banner */}
-        {!loading && notification && (
-          <div className="max-w-md mx-auto mb-6 bg-[#ffdb3c]/10 border border-[#ffdb3c]/20 text-[#ffe16d] rounded-2xl p-3.5 text-center text-xs font-bold shadow-xl animate-fade-in font-sans">
-            {notification}
           </div>
         )}
 

@@ -22,6 +22,7 @@ export const PROVIDERS = [
   { id: "npostart", name: "NPO Start" },
   { id: "viaplay", name: "Viaplay" },
   { id: "skyshowtime", name: "SkyShowtime" },
+  { id: "pirate", name: "Alle Films (Piraat)" },
 ];
 
 export const GENRES = [
