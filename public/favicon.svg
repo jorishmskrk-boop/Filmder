@@ -48,9 +48,6 @@
     </mask>
   </defs>
 
-  <!-- Background circle so the icon remains colored and visible in all tabs -->
-  <circle cx="50" cy="50" r="46" fill="#12121d" stroke="#ff5637" stroke-width="2.5" />
-
   <!-- Main Flame body (Masked for the holes and center hole) -->
   <path
     d="M 52 4 
