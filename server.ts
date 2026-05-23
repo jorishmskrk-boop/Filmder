@@ -165,66 +165,10 @@ app.post("/api/movies", movieLimiter, async (req, res) => {
       .filter((id): id is number => id !== undefined);
     const providerIdString = providerIds.join("|");
 
-    // Choose a random curation strategy to yield highly dynamic lists (9 plans)
-    const sortOptions = ["popularity.desc", "revenue.desc", "vote_average.desc", "vote_count.desc", "primary_release_date.desc"];
-    let sortParam = sortOptions[Math.floor(Math.random() * sortOptions.length)];
-    
-    // To drastically maximize results entropy and rotate movies on pages 1/2, 
-    // we stagger the minimum vote counts randomly (ranging from 120 up to 750) list by list.
-    const randomVoteCounts = [120, 180, 250, 350, 500, 750];
-    const voteMin = randomVoteCounts[Math.floor(Math.random() * randomVoteCounts.length)];
-    let customParams = `&vote_count.gte=${voteMin}`;
-    let maxPageTarget = 40; // Max page depth we want to target for discovery
+    const hasUserYearFilter = (minYear !== undefined && minYear > 0) || (maxYear !== undefined && maxYear > 0) || (releaseDecade && releaseDecade !== "all");
+    const hasUserGenreFilter = selectedVibe.trim().length > 0;
 
-    const curationPlan = Math.floor(Math.random() * 9);
-
-    // Set curation strategy sort codes and target page range limits
-    switch (curationPlan) {
-      case 0:
-        sortParam = Math.random() > 0.5 ? "popularity.desc" : "revenue.desc";
-        maxPageTarget = 45;
-        break;
-      case 1:
-        sortParam = "vote_average.desc";
-        customParams = `&vote_count.gte=${Math.max(voteMin, 400)}`; // Higher rating threshold requires a stronger vote count
-        maxPageTarget = 35;
-        break;
-      case 2:
-        const currentYear = new Date().getFullYear();
-        customParams += `&primary_release_date.gte=2015-01-01&primary_release_date.lte=${currentYear}-12-31`;
-        maxPageTarget = 55;
-        break;
-      case 3:
-        sortParam = "popularity.desc";
-        customParams += "&primary_release_date.gte=1980-01-01&primary_release_date.lte=2015-12-31";
-        maxPageTarget = 45;
-        break;
-      case 4:
-        sortParam = "vote_count.desc";
-        customParams += `&vote_count.gte=${Math.max(voteMin, 200)}&vote_count.lte=2500`;
-        maxPageTarget = 35;
-        break;
-      case 5:
-        sortParam = "popularity.desc";
-        customParams += "&primary_release_date.gte=1995-01-01";
-        maxPageTarget = 40;
-        break;
-      case 6:
-        customParams += "&with_genres=878,53,9648";
-        maxPageTarget = 35;
-        break;
-      case 7:
-        customParams += "&with_genres=35,10749,16,12";
-        maxPageTarget = 40;
-        break;
-      case 8:
-        sortParam = "vote_average.desc";
-        customParams += `&primary_release_date.gte=1950-01-01&primary_release_date.lte=1989-12-31&vote_count.gte=${Math.max(voteMin, 200)}`;
-        maxPageTarget = 20;
-        break;
-    }
-
-    // Function to append active range and year filters to customParams safely
+    // Safe helper function to append active runtime and rating range bounds safely
     const appendUserFilters = (paramsStr: string) => {
       let resStr = paramsStr;
       if (minRuntime !== undefined && minRuntime > 0) {
@@ -243,8 +187,6 @@ app.post("/api/movies", movieLimiter, async (req, res) => {
         const wideMax = Math.min(10, maxRating + 1.2);
         resStr += `&vote_average.lte=${wideMax}`;
       }
-      
-      const hasUserYearFilter = (minYear !== undefined && minYear > 0) || (maxYear !== undefined && maxYear > 0) || (releaseDecade && releaseDecade !== "all");
 
       if (hasUserYearFilter) {
         if (minYear !== undefined && minYear > 0) {
@@ -258,22 +200,6 @@ app.post("/api/movies", movieLimiter, async (req, res) => {
             resStr += `&primary_release_date.gte=${decadeNum}-01-01&primary_release_date.lte=${decadeNum + 9}-12-31`;
           }
         }
-      } else {
-        // Broad parametric era randomization (60% likelihood) to fetch and group extremely different movies!
-        if (Math.random() < 0.6) {
-          const currentYear = new Date().getFullYear();
-          const periods = [
-            { gte: "2020-01-01", lte: `${currentYear}-12-31` }, // Modern
-            { gte: "2013-01-01", lte: "2019-12-31" },          // High-definition tens
-            { gte: "2005-01-01", lte: "2012-12-31" },          // Early LCD era
-            { gte: "1997-01-01", lte: "2004-12-31" },          // Millennial movies
-            { gte: "1990-01-01", lte: "1996-12-31" },          // Nineties peak
-            { gte: "1980-01-01", lte: "1989-12-31" },          // Golden Eighties
-            { gte: "1960-01-01", lte: "1979-12-31" }           // Retro and classic cinema
-          ];
-          const chosenPeriod = periods[Math.floor(Math.random() * periods.length)];
-          resStr += `&primary_release_date.gte=${chosenPeriod.gte}&primary_release_date.lte=${chosenPeriod.lte}`;
-        }
       }
 
       if (ageRating) {
@@ -282,141 +208,185 @@ app.post("/api/movies", movieLimiter, async (req, res) => {
       return resStr;
     };
 
-    // Apply modular background filters specified in req.body
-    customParams = appendUserFilters(customParams);
-
     const genresString = selectedVibe.trim() ? selectedVibe.trim().replace(/,/g, "|") : "";
+
+    // Helper to generate 3 diverse movie recipes
+    const getRecipes = (level: number) => {
+      const list: Array<{
+        sort: string;
+        custom: string;
+        genres: string;
+        providers: string;
+      }> = [];
+
+      // Recipe 1: Modern Blockbusters & High-energy cinema (Action, Adventure, Sci-Fi, Thriller)
+      let r1Genres = genresString;
+      if (level === 0 && !hasUserGenreFilter) {
+        r1Genres = "28|12|878|53";
+      }
+      let r1Custom = "";
+      if (level === 0) {
+        r1Custom = "&vote_count.gte=300";
+        if (!hasUserYearFilter) {
+          r1Custom += "&primary_release_date.gte=2012-01-01";
+        }
+      } else if (level === 1) {
+        r1Custom = "&vote_count.gte=150";
+      }
+      r1Custom = appendUserFilters(r1Custom);
+
+      list.push({
+        sort: "popularity.desc",
+        custom: r1Custom,
+        genres: r1Genres,
+        providers: level >= 4 ? "" : providerIdString
+      });
+
+      // Recipe 2: Critical Masterpieces, Cinematic Gems & Classics (Drama, Mystery, History, Crime, Documentary)
+      let r2Genres = genresString;
+      if (level === 0 && !hasUserGenreFilter) {
+        r2Genres = "18|9648|36|80|99";
+      }
+      let r2Custom = "";
+      if (level === 0) {
+        r2Custom = "&vote_count.gte=180";
+        if (!hasUserYearFilter) {
+          r2Custom += "&primary_release_date.gte=1980-01-01&primary_release_date.lte=2011-12-31";
+        }
+      } else if (level === 1) {
+        r2Custom = "&vote_count.gte=90";
+      }
+      r2Custom = appendUserFilters(r2Custom);
+
+      list.push({
+        sort: "vote_average.desc",
+        custom: r2Custom,
+        genres: r2Genres,
+        providers: level >= 4 ? "" : providerIdString
+      });
+
+      // Recipe 3: Feel-Good, Fun, Family & Nostalgic Wildcard (Comedy, Romance, Animation, Family, Fantasy)
+      let r3Genres = genresString;
+      if (level === 0 && !hasUserGenreFilter) {
+        r3Genres = "35|10749|16|10751|14";
+      }
+      let r3Custom = "";
+      if (level === 0) {
+        r3Custom = "&vote_count.gte=120";
+        if (!hasUserYearFilter) {
+          r3Custom += "&primary_release_date.gte=1960-01-01&primary_release_date.lte=2015-12-31";
+        }
+      } else if (level === 1) {
+        r3Custom = "&vote_count.gte=60";
+      }
+      r3Custom = appendUserFilters(r3Custom);
+
+      list.push({
+        sort: Math.random() > 0.5 ? "revenue.desc" : "vote_count.desc",
+        custom: r3Custom,
+        genres: r3Genres,
+        providers: level >= 4 ? "" : providerIdString
+      });
+
+      // Adjust configurations for higher fallback levels
+      if (level >= 2) {
+        // Fallback Level 2: Wipe all automated curation genres and eras completely (reverting strictly to user selections)
+        list.forEach((recipe, idx) => {
+          recipe.genres = genresString;
+          let baseCustom = "";
+          if (idx === 0) {
+            recipe.sort = "popularity.desc";
+            baseCustom = "&vote_count.gte=100";
+          } else if (idx === 1) {
+            recipe.sort = "vote_average.desc";
+            baseCustom = "&vote_count.gte=80";
+          } else {
+            recipe.sort = "vote_count.desc";
+            baseCustom = "&vote_count.gte=60";
+          }
+          recipe.custom = appendUserFilters(baseCustom);
+        });
+      }
+
+      if (level >= 3) {
+        // Fallback Level 3: Wipe advanced user rating / runtime ceilings to guarantee results
+        list.forEach((recipe) => {
+          recipe.custom = "";
+          recipe.genres = "";
+        });
+      }
+
+      return list;
+    };
 
     let rawResults: TMDBItem[] = [];
     let fallbackLevel = 0;
     let activeFallbackLevel = 0;
-    let probedPage1Results: TMDBItem[] = [];
-    let probedTotalPages = 1;
 
     // Use a multi-tier fallback system to avoid zero-results crashes if filters are too restrictive
     while (rawResults.length < 5 && fallbackLevel <= 4) {
-      let activeCustomParams = customParams;
-      let activeSortParam = sortParam;
-      let activeGenresString = genresString;
-      let activeProviderIdString = providerIdString;
-      let safeMaxPage = 1;
+      const activeRecipes = getRecipes(fallbackLevel);
 
-      if (fallbackLevel === 0) {
-        // Fallback Tier 0 (Default): Use our safe, dynamically calculated randomized page offsets!
-        // We probe Page 1 of this exact configuration to find out the safe total_pages bounds.
-        const baseQueryPart = `&watch_region=${selectedCountry}&sort_by=${activeSortParam}${activeCustomParams}` +
-          (activeProviderIdString ? `&with_watch_providers=${activeProviderIdString}` : "") +
-          (activeGenresString ? `&with_genres=${activeGenresString}` : "");
-
-        probedTotalPages = 1;
-        probedPage1Results = [];
-        try {
-          const probeUrl = `https://api.themoviedb.org/3/discover/movie?api_key=${tmdbKey}&page=1${baseQueryPart}`;
-          const probeRes = await fetch(probeUrl);
-          if (probeRes.ok) {
-            const probeData = await probeRes.json() as TMDBResponse;
-            probedTotalPages = probeData.total_pages || 1;
-            probedPage1Results = probeData.results || [];
-          }
-        } catch (e) {
-          console.error("Error probing TMDB page count:", e);
-        }
-
-        if (activeProviderIdString) {
-          // Keep it highly dense to ensure results exist under watch provider filters
-          safeMaxPage = Math.min(probedTotalPages, 5);
-        } else {
-          // Without provider restrictions we can go slightly deeper safely
-          safeMaxPage = Math.min(probedTotalPages, 12);
-        }
-      } else if (fallbackLevel === 1) {
-        // Fallback Tier 1: Try a safe, guaranteed range of pages
-        const maxLimit = activeProviderIdString ? 6 : 15;
-        safeMaxPage = Math.min(probedTotalPages || 1, maxLimit);
-      } else if (fallbackLevel === 2) {
-        // Fallback Tier 2: Completely neutralize restrictive curation plan filters, keeping user filters only
-        const maxLimit = activeProviderIdString ? 8 : 20;
-        safeMaxPage = Math.min(probedTotalPages || 1, maxLimit);
-        activeSortParam = "popularity.desc";
-        activeCustomParams = appendUserFilters(""); // Wipe random curation limits but keep user filters
-      } else if (fallbackLevel === 3) {
-        // Fallback Tier 3: Neutralize advanced custom ratings, runtime ceilings, release decade boundaries
-        safeMaxPage = 12;
-        activeSortParam = "popularity.desc";
-        activeCustomParams = "";
-        activeGenresString = "";
-      } else if (fallbackLevel === 4) {
-        // Fallback Tier 4: Universal backup, ignore watch providers restriction completely to guarantee we fetch something
-        safeMaxPage = 20;
-        activeSortParam = "popularity.desc";
-        activeCustomParams = "";
-        activeGenresString = "";
-        activeProviderIdString = "";
+      const hasProviders = providerIdString.length > 0;
+      let safeMaxPage = hasProviders ? 4 : 12;
+      if (fallbackLevel === 1) {
+        safeMaxPage = hasProviders ? 2 : 6;
+      } else if (fallbackLevel >= 2) {
+        safeMaxPage = 2;
       }
-
       if (safeMaxPage < 1) safeMaxPage = 1;
 
-      // Select up to 3 distinct random page numbers for maximum diversity!
-      const pageSet = new Set<number>();
-      let selectionAttempts = 0;
-      const targetPagesCount = Math.min(safeMaxPage, 3);
-      while (pageSet.size < targetPagesCount && selectionAttempts < 15) {
-        selectionAttempts++;
-        const p = Math.floor(Math.random() * safeMaxPage) + 1;
-        pageSet.add(p);
-      }
-      const pagesToFetch = Array.from(pageSet);
+      // Select randomized page index for each active recipe in parallel
+      const fetchPromises = activeRecipes.map(async (recipe) => {
+        const pageNum = Math.floor(Math.random() * safeMaxPage) + 1;
+        let pageUrl = `https://api.themoviedb.org/3/discover/movie?api_key=${tmdbKey}&watch_region=${selectedCountry}&sort_by=${recipe.sort}&page=${pageNum}${recipe.custom}`;
+        if (recipe.providers) {
+          pageUrl += `&with_watch_providers=${recipe.providers}`;
+        }
+        if (recipe.genres) {
+          pageUrl += `&with_genres=${recipe.genres}`;
+        }
 
-      try {
-        let levelResults: TMDBItem[] = [];
-
-        // Build URLs for all selected pages and run in parallel
-        const fetchPromises = pagesToFetch.map(async (pageStrNumber) => {
-          // Re-use probed cached Page 1 if possible
-          if (fallbackLevel === 0 && pageStrNumber === 1 && typeof probedPage1Results !== "undefined" && probedPage1Results.length > 0) {
-            return probedPage1Results;
+        try {
+          const pageRes = await fetch(pageUrl);
+          if (pageRes.ok) {
+            const data = await pageRes.json() as TMDBResponse;
+            if (data.results && data.results.length > 0) {
+              return data.results;
+            }
           }
+        } catch (err) {
+          console.error(`Error fetching page ${pageNum} for recipe sort ${recipe.sort}:`, err);
+        }
 
-          let pageUrl = `https://api.themoviedb.org/3/discover/movie?api_key=${tmdbKey}&watch_region=${selectedCountry}&sort_by=${activeSortParam}&page=${pageStrNumber}${activeCustomParams}`;
-          if (activeProviderIdString) {
-            pageUrl += `&with_watch_providers=${activeProviderIdString}`;
+        // Bisection fallback: if a deep randomized page turns up empty (due to restrictive watch providers), try page 1
+        if (pageNum > 1) {
+          let fallbackUrl = `https://api.themoviedb.org/3/discover/movie?api_key=${tmdbKey}&watch_region=${selectedCountry}&sort_by=${recipe.sort}&page=1${recipe.custom}`;
+          if (recipe.providers) {
+            fallbackUrl += `&with_watch_providers=${recipe.providers}`;
           }
-          if (activeGenresString) {
-            pageUrl += `&with_genres=${activeGenresString}`;
+          if (recipe.genres) {
+            fallbackUrl += `&with_genres=${recipe.genres}`;
           }
-
           try {
-            const pageRes = await fetch(pageUrl);
+            const pageRes = await fetch(fallbackUrl);
             if (pageRes.ok) {
               const data = await pageRes.json() as TMDBResponse;
               return data.results || [];
             }
           } catch (err) {
-            console.error(`Error fetching page ${pageStrNumber} in fallbackLevel ${fallbackLevel}:`, err);
+            console.error(`Error in page 1 fallback for recipe sort ${recipe.sort}:`, err);
           }
-          return [];
-        });
+        }
+        return [];
+      });
 
+      try {
+        let levelResults: TMDBItem[] = [];
         const resultsArrays = await Promise.all(fetchPromises);
         resultsArrays.forEach(arr => {
           levelResults = levelResults.concat(arr);
         });
-
-        // Bisection fallback if all random pages turned up empty (highly possible under restrictive watch filters for deep pages)
-        if (levelResults.length === 0 && pagesToFetch.some(p => p > 1)) {
-          let bisectionUrl = `https://api.themoviedb.org/3/discover/movie?api_key=${tmdbKey}&watch_region=${selectedCountry}&sort_by=${activeSortParam}&page=1${activeCustomParams}`;
-          if (activeProviderIdString) {
-            bisectionUrl += `&with_watch_providers=${activeProviderIdString}`;
-          }
-          if (activeGenresString) {
-            bisectionUrl += `&with_genres=${activeGenresString}`;
-          }
-          const bRes = await fetch(bisectionUrl).catch(() => null);
-          if (bRes?.ok) {
-            const bData = await bRes.json() as TMDBResponse;
-            levelResults = bData.results || [];
-          }
-        }
 
         if (levelResults.length > 0) {
           // De-duplicate items by TMDB ID AND filter out already excluded / swiped movies!
