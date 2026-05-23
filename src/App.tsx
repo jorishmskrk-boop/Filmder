@@ -111,6 +111,19 @@ export default function App() {
         setLoading(true);
 
         try {
+          const swipedIds = new Set<string>();
+          if (room.swipes) {
+            Object.values(room.swipes).forEach((userSwipes: any) => {
+              if (userSwipes) {
+                Object.keys(userSwipes).forEach(movieId => swipedIds.add(String(movieId)));
+              }
+            });
+          }
+          if (room.movies) {
+            room.movies.forEach((m: any) => swipedIds.add(String(m.id)));
+          }
+          const excludeIds = Array.from(swipedIds);
+
           const res = await fetch("/api/movies", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -126,6 +139,7 @@ export default function App() {
               minYear: room.minYear,
               maxYear: room.maxYear,
               ageRating: room.ageRating,
+              excludeIds,
             }),
           });
 
@@ -404,6 +418,19 @@ export default function App() {
     setErrorMsg(null);
 
     try {
+      const swipedIds = new Set<string>();
+      if (room.swipes) {
+        Object.values(room.swipes).forEach((userSwipes: any) => {
+          if (userSwipes) {
+            Object.keys(userSwipes).forEach(movieId => swipedIds.add(String(movieId)));
+          }
+        });
+      }
+      if (room.movies) {
+        room.movies.forEach((m: any) => swipedIds.add(String(m.id)));
+      }
+      const excludeIds = Array.from(swipedIds);
+
       const res = await fetch("/api/movies", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -415,6 +442,7 @@ export default function App() {
           minRating: room.minRating,
           releaseDecade: room.releaseDecade,
           ageRating: room.ageRating,
+          excludeIds,
         }),
       });
 

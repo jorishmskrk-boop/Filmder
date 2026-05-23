@@ -72,7 +72,7 @@ export default function LobbyScreen({ room, currentUserId, onStartSwiping, onLea
         {/* Active Participants */}
         <div className="space-y-3">
           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest text-left pl-1">
-            {language === "nl" ? `Verbonden Spelers (${usersList.length}/2)` : `Connected Players (${usersList.length}/2)`}
+            {language === "nl" ? `Verbonden Spelers (${usersList.length})` : `Connected Players (${usersList.length})`}
           </h3>
           <div className="space-y-2.5">
             {usersList.map(([uid, username]) => {
@@ -97,15 +97,15 @@ export default function LobbyScreen({ room, currentUserId, onStartSwiping, onLea
                     <span className="font-bold">{username}</span>
                   </div>
                   <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
-                    {isMe ? (language === "nl" ? "Host (Jij)" : "Host (You)") : (language === "nl" ? "Deelnemer" : "Participant")}
+                    {isMe ? (language === "nl" ? "Host (Jij)" : "Host (You)") : (language === "nl" ? "Speler" : "Player")}
                   </span>
                 </div>
               );
             })}
 
-            {!hasPartner && (
+            {usersList.length < 2 && (
               <div className="p-3.5 rounded-xl border border-dashed border-white/10 bg-black/10 text-slate-400 text-xs italic py-4">
-                {language === "nl" ? "Wachten totdat een partner verbinding maakt..." : "Waiting for a partner to join room..."}
+                {language === "nl" ? "Deel de onderstaande link om vrienden uit te nodigen voor je lobby! 🍿" : "Share the link below to invite friends to join your lobby! 🍿"}
               </div>
             )}
           </div>
@@ -114,7 +114,7 @@ export default function LobbyScreen({ room, currentUserId, onStartSwiping, onLea
         {/* Dynamic Invite Link Card */}
         <div className="space-y-2 text-left">
           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block pl-1">
-            {language === "nl" ? "Partner Direct Uitnodigen (Kopieer link)" : "Directly Invite Partner (Copy link)"}
+            {language === "nl" ? "Vrienden Direct Uitnodigen (Kopieer link)" : "Directly Invite Friends (Copy link)"}
           </label>
           <div className="flex bg-black/20 border border-white/5 hover:border-white/10 rounded-xl overflow-hidden transition-all">
             <input

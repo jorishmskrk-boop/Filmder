@@ -37,21 +37,32 @@ export default function SwipeScreen({
 
   // Find partner details
   const usersList = Object.entries(room.users || {});
-  const partnerEntry = usersList.find(([uid]) => uid !== currentUserId);
-  const partnerId = partnerEntry?.[0];
-  const partnerName = partnerEntry?.[1] || "Partner";
+  const otherUsers = usersList.filter(([uid]) => uid !== currentUserId);
+  const partnerId = otherUsers[0]?.[0];
+  const partnerName = otherUsers.length === 0
+    ? "Partner"
+    : otherUsers.length === 1
+      ? otherUsers[0]?.[1] || "Partner"
+      : language === "nl"
+        ? "de andere spelers"
+        : "the other players";
 
   // Filter unswiped movies
   const currentMovies = room.movies || [];
   const mySwipes = room.swipes?.[currentUserId] || {};
   const unswipedMovies = currentMovies.filter(m => mySwipes[m.id] === undefined);
 
-  // Check if partner is finished with the current stack of movies
-  const partnerSwipes = partnerId ? (room.swipes?.[partnerId] || {}) : {};
-  const partnerFinished = !partnerId || (currentMovies.length > 0 && currentMovies.every(m => partnerSwipes[m.id] !== undefined));
+  // Check how many other players are finished with the current stack of movies
+  const totalOtherUsersCount = otherUsers.length;
+  const finishedOthersCount = otherUsers.filter(([uid]) => {
+    const swipes = room.swipes?.[uid] || {};
+    return currentMovies.length > 0 && currentMovies.every(m => swipes[m.id] !== undefined);
+  }).length;
+
+  const partnerFinished = otherUsers.length === 0 || finishedOthersCount === totalOtherUsersCount;
 
   // If solo, we list all the user's swiped/liked movies
-  const isSolo = !partnerId;
+  const isSolo = otherUsers.length === 0;
   const displayMatches = isSolo
     ? (room.movies || []).filter(m => mySwipes[m.id] === true)
     : (room.matches || []);
@@ -74,29 +85,44 @@ export default function SwipeScreen({
     setSwipeDirection(null);
   }, [unswipedMovies[0]?.id]);
 
-  // Monitor reactions
+  // Monitor reactions of all other users
   useEffect(() => {
-    if (!partnerId) return;
-    const reaction = room.reactions?.[partnerId];
-    if (!reaction) return;
+    if (otherUsers.length === 0) return;
+    
+    // Find the most recent reaction from any of the other users
+    let latestReactionUser: string | null = null;
+    let latestReaction: any = null;
+    let maxTimestamp = 0;
+
+    otherUsers.forEach(([uid]) => {
+      const userReaction = room.reactions?.[uid];
+      if (userReaction && userReaction.timestamp > maxTimestamp) {
+        maxTimestamp = userReaction.timestamp;
+        latestReaction = userReaction;
+        latestReactionUser = uid;
+      }
+    });
+
+    if (!latestReaction || !latestReactionUser) return;
 
     // Only show if reaction is recent (made within the last 15 seconds)
-    const timeDiff = Date.now() - reaction.timestamp;
+    const timeDiff = Date.now() - latestReaction.timestamp;
     if (timeDiff < 15000) {
       if (activeReactionTimer.current) clearTimeout(activeReactionTimer.current);
 
-      const mapped = REACTION_MAP[reaction.emoji] || { label: reaction.emoji, labelEn: reaction.emoji, color: "" };
+      const senderName = room.users?.[latestReactionUser] || "Speler";
+      const mapped = REACTION_MAP[latestReaction.emoji] || { label: latestReaction.emoji, labelEn: latestReaction.emoji, color: "" };
       const displayLabel = language === "nl" ? mapped.label : mapped.labelEn;
       setPartnerReaction({
         label: displayLabel,
-        text: language === "nl" ? `${partnerName} stuurde: "${displayLabel}"` : `${partnerName} sent: "${displayLabel}"`,
+        text: language === "nl" ? `${senderName} stuurde: "${displayLabel}"` : `${senderName} sent: "${displayLabel}"`,
       });
 
       activeReactionTimer.current = setTimeout(() => {
         setPartnerReaction(null);
       }, 2500);
     }
-  }, [room.reactions, partnerId, partnerName, language]);
+  }, [room.reactions, otherUsers, language]);
 
   // Keep track of which movie matches we have already shown celebrations for in this session
   const celebratedMovieIds = useRef<Set<string>>(new Set());
@@ -353,21 +379,31 @@ export default function SwipeScreen({
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#ff5637] to-[#ba1c00] flex items-center justify-center text-white select-none border border-white/10">
                   <User className="w-5 h-5 text-white" />
                 </div>
-                <div className={`absolute -bottom-1 -right-1 w-5 h-5 border-2 border-[#12121d] rounded-full ${partnerId ? "bg-[#ffdb3c]" : "bg-neutral-800"}`}></div>
+                <div className={`absolute -bottom-1 -right-1 w-5 h-5 border-2 border-[#12121d] rounded-full ${otherUsers.length > 0 ? "bg-[#ffdb3c]" : "bg-neutral-800"}`}></div>
               </div>
               <div>
                 <p className="text-sm font-bold text-white leading-tight">
-                  {partnerId ? partnerName : (language === "nl" ? "Alleen Swipen" : "Swiping Solo")}
+                  {otherUsers.length > 0 
+                    ? (otherUsers.length === 1 ? partnerName : (language === "nl" ? `${otherUsers.length} Medespelers` : `${otherUsers.length} Other Players`)) 
+                    : (language === "nl" ? "Alleen Swipen" : "Swiping Solo")}
                 </p>
-                <p className="text-xs text-slate-400 mt-1">
-                  {partnerId 
-                    ? room.reactions?.[partnerId] 
-                      ? (language === "nl" 
+                <div className="text-xs text-slate-400 mt-1">
+                  {otherUsers.length === 1 ? (
+                    room.reactions?.[partnerId] ? (
+                      language === "nl" 
                         ? `Reageerde met "${REACTION_MAP[room.reactions[partnerId].emoji]?.label || room.reactions[partnerId].emoji}"`
-                        : `Reacted with "${REACTION_MAP[room.reactions[partnerId].emoji]?.labelEn || room.reactions[partnerId].emoji}"`)
-                      : (language === "nl" ? "Swipet door de catalogus..." : "Swiping through catalog...")
-                    : (language === "nl" ? "Nodig je partner uit!" : "Invite your partner!")}
-                </p>
+                        : `Reacted with "${REACTION_MAP[room.reactions[partnerId].emoji]?.labelEn || room.reactions[partnerId].emoji}"`
+                    ) : (
+                      language === "nl" ? "Swipet door de catalogus..." : "Swiping through catalog..."
+                    )
+                  ) : otherUsers.length > 1 ? (
+                    language === "nl"
+                      ? `${finishedOthersCount}/${totalOtherUsersCount} spelers klaar!`
+                      : `${finishedOthersCount}/${totalOtherUsersCount} players finished!`
+                  ) : (
+                    language === "nl" ? "Nodig je vrienden uit!" : "Invite your friends!"
+                  )}
+                </div>
               </div>
             </div>
           </div>
