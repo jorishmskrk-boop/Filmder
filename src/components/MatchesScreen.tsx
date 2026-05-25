@@ -1,5 +1,5 @@
 import { Movie, Room } from "../types";
-import { Award, Star, Play, Ghost, Heart } from "lucide-react";
+import { Award, Star, Play, Ghost, Heart, Sparkles } from "lucide-react";
 import ProviderLogo from "./ProviderLogo";
 import { useLanguage } from "../LanguageContext";
 
@@ -11,6 +11,7 @@ interface MatchesScreenProps {
   isSolo?: boolean;
   onRemoveMatch: (movieId: string) => void;
   onToggleSuperLike: (movieId: string) => void;
+  onFetchSimilarBatch?: () => void;
 }
 
 export default function MatchesScreen({
@@ -21,6 +22,7 @@ export default function MatchesScreen({
   isSolo = false,
   onRemoveMatch,
   onToggleSuperLike,
+  onFetchSimilarBatch,
 }: MatchesScreenProps) {
   const { language, t } = useLanguage();
 
@@ -57,13 +59,27 @@ export default function MatchesScreen({
           </p>
         </div>
 
-        <button
-          id="watchlist-back-btn"
-          onClick={onBackToSwipes}
-          className="px-5 py-2.5 rounded-full bg-black/20 border border-white/5 hover:bg-white/5 hover:border-[#ff5637]/30 text-white text-xs font-bold transition-all cursor-pointer select-none"
-        >
-          {language === "nl" ? "Verder Swipen" : "Keep Swiping"}
-        </button>
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          {matches.length > 0 && onFetchSimilarBatch && (
+            <button
+              id="watchlist-similar-btn"
+              onClick={onFetchSimilarBatch}
+              className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-gradient-to-r from-[#ff5637]/20 to-[#ba1c00]/20 border border-[#ff5637]/45 hover:border-[#ff5637] text-[#ffdb3c] hover:text-white text-xs font-bold transition-all cursor-pointer select-none flex items-center justify-center gap-2 shadow-md hover:scale-[1.02] active:scale-95"
+              title={language === "nl" ? "Maak een nieuwe filmstapel gebaseerd op je matches" : "Create a new movie stack based on your matches"}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-[#ffdb3c] animate-pulse" />
+              <span>{language === "nl" ? "Vind Vergelijkbare Films" : "Find Similar Movies"}</span>
+            </button>
+          )}
+
+          <button
+            id="watchlist-back-btn"
+            onClick={onBackToSwipes}
+            className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-black/20 border border-white/5 hover:bg-white/5 hover:border-[#ff5637]/30 text-white text-xs font-bold transition-all cursor-pointer select-none text-center"
+          >
+            {language === "nl" ? "Verder Swipen" : "Keep Swiping"}
+          </button>
+        </div>
       </div>
 
       {/* Grid of Matched Movies */}

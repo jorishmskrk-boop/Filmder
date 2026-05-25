@@ -102,18 +102,18 @@ export async function swipeMovieInFirestore(code: string, userId: string, movieI
   }
 }
 
-export async function addMatchInFirestore(code: string, movieId: string) {
+export async function addMatchInFirestore(code: string, movie: Movie | string) {
   const roomDocRef = getRoomRef(code);
   try {
     await updateDoc(roomDocRef, {
-      matches: arrayUnion(movieId),
+      matches: arrayUnion(movie),
     });
   } catch (err: any) {
     handleFirestoreError(err, OperationType.WRITE, getPath(code));
   }
 }
 
-export async function updateMatchesInFirestore(code: string, updatedMatches: string[]) {
+export async function updateMatchesInFirestore(code: string, updatedMatches: (Movie | string)[]) {
   const roomDocRef = getRoomRef(code);
   try {
     await updateDoc(roomDocRef, {

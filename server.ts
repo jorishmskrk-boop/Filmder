@@ -389,13 +389,14 @@ app.post("/api/movies", movieLimiter, async (req, res) => {
           );
           if (detailsRes.ok) {
             const details = await detailsRes.json() as {
+              imdb_id?: string;
               external_ids?: { imdb_id?: string };
               videos?: { results?: { site?: string; type?: string; key?: string }[] };
               "watch/providers"?: { results?: Record<string, { flatrate?: { provider_id: number }[]; rent?: { provider_id: number }[]; buy?: { provider_id: number }[]; free?: { provider_id: number }[]; ads?: { provider_id: number }[] }> };
             };
 
-            // 1. Resolve IMDb ID
-            imdbId = details.external_ids?.imdb_id || undefined;
+            // 1. Resolve IMDb ID (checking both top-level and external_ids for maximum resilience)
+            imdbId = details.imdb_id || details.external_ids?.imdb_id || undefined;
 
             // 2. Resolve YouTube Trailer URL
             const videos = details.videos?.results || [];
@@ -501,6 +502,274 @@ app.post("/api/movies", movieLimiter, async (req, res) => {
   } catch (error: any) {
     console.error("Movie curation error:", error);
     return res.status(500).json({ error: error.message || "An error occurred while curating movies." });
+  }
+});
+
+// API Endpoint to fetch recommendations based on swiped matches
+app.post("/api/recommendations", movieLimiter, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const { movieIds, country, providers, ageRating } = body as {
+      movieIds?: string[];
+      country?: string;
+      providers?: string[];
+      ageRating?: boolean;
+    };
+
+    if (!Array.isArray(movieIds) || movieIds.length === 0) {
+      return res.status(400).json({ error: "Geen gematchte of bewaarde films opgegeven om aanbevelingen op te baseren." });
+    }
+
+    const minRuntime = typeof body.minRuntime === "number" ? body.minRuntime : undefined;
+    const maxRuntime = typeof body.maxRuntime === "number" ? body.maxRuntime : typeof body.maxRuntime === "string" ? parseInt(body.maxRuntime) : undefined;
+    const minRating = typeof body.minRating === "number" ? body.minRating : typeof body.minRating === "string" ? parseFloat(body.minRating) : undefined;
+    const maxRating = typeof body.maxRating === "number" ? body.maxRating : typeof body.maxRating === "string" ? parseFloat(body.maxRating) : undefined;
+    const minYear = typeof body.minYear === "number" ? body.minYear : typeof body.minYear === "string" ? parseInt(body.minYear) : undefined;
+    const maxYear = typeof body.maxYear === "number" ? body.maxYear : typeof body.maxYear === "string" ? parseInt(body.maxYear) : undefined;
+    const releaseDecade = body.releaseDecade;
+    const excludeIds = Array.isArray(body.excludeIds) ? body.excludeIds.map((id: any) => String(id)) : [];
+    
+    const sourceMovieIdsSet = new Set(movieIds.map(id => String(id)));
+
+    const selectedProviders: string[] = providers || ["netflix"];
+    const selectedCountry = country || "NL";
+
+    const serverTmdbKey = process.env.TMDB_API_KEY;
+    if (!serverTmdbKey || serverTmdbKey.trim().length === 0) {
+      return res.status(500).json({ error: "TMDB API Key is niet geconfigureerd op de server." });
+    }
+    const tmdbKey = serverTmdbKey.trim();
+
+    // Limit to last 5 matched movies to focus recommendations on recent tastes
+    const targetMovieIds = movieIds.map(String).slice(-5);
+
+    // Fetch recommendations for each reference movie in parallel
+    const fetchRecommendationsForMovie = async (id: string): Promise<TMDBItem[]> => {
+      try {
+        const url = `https://api.themoviedb.org/3/movie/${id}/recommendations?api_key=${tmdbKey}`;
+        const response = await fetch(url);
+        if (response.ok) {
+          const data = await response.json() as TMDBResponse;
+          if (data.results && data.results.length > 0) {
+            return data.results;
+          }
+        }
+      } catch (err) {
+        console.error(`Error querying recommendations for TMDB movie ${id}:`, err);
+      }
+      
+      // Fallback to similar
+      try {
+        const url = `https://api.themoviedb.org/3/movie/${id}/similar?api_key=${tmdbKey}`;
+        const response = await fetch(url);
+        if (response.ok) {
+          const data = await response.json() as TMDBResponse;
+          return data.results || [];
+        }
+      } catch (err) {
+        console.error(`Error querying similar for TMDB movie ${id}:`, err);
+      }
+      return [];
+    };
+
+    const resultsArrays = await Promise.all(targetMovieIds.map(fetchRecommendationsForMovie));
+
+    // Simple but clever co-occurrence matching
+    const coCounts: Record<number, number> = {};
+    const itemsMap: Record<number, TMDBItem> = {};
+
+    for (const arr of resultsArrays) {
+      for (const item of arr) {
+        if (item && item.id) {
+          const idStr = String(item.id);
+          // Strictly exclude the seed movies and movies already swiped
+          if (!sourceMovieIdsSet.has(idStr) && !excludeIds.includes(idStr)) {
+            coCounts[item.id] = (coCounts[item.id] || 0) + 1;
+            itemsMap[item.id] = item;
+          }
+        }
+      }
+    }
+
+    const candidateIds = Object.keys(coCounts).map(Number);
+    if (candidateIds.length === 0) {
+      return res.json({ source: "TMDB_RECOMMENDATIONS", movies: [] });
+    }
+
+    // Sort by co-recommendation count, and then popularity on TMDB
+    candidateIds.sort((a, b) => {
+      const countDiff = coCounts[b] - coCounts[a];
+      if (countDiff !== 0) return countDiff;
+      return (itemsMap[b].vote_average || 0) - (itemsMap[a].vote_average || 0);
+    });
+
+    const items = candidateIds.slice(0, 35).map(id => itemsMap[id]);
+
+    const genreNamesMap: Record<number, string> = {
+      28: "Actie", 12: "Avontuur", 16: "Animatie", 35: "Komedie", 80: "Misdaad",
+      99: "Documentaire", 18: "Drama", 10751: "Familie", 14: "Fantasie", 36: "Geschiedenis",
+      27: "Horror", 10402: "Muziek", 9648: "Mysterie", 10749: "Romantiek", 878: "Sci-Fi",
+      10770: "TV-Film", 53: "Thriller", 10752: "Oorlog", 37: "Western"
+    };
+
+    // Parallel extraction of detailed metadata (provider filtering, trailer links, IMDb integration)
+    const promises = items.map(async (item) => {
+      const itemGenres = (item.genre_ids || [])
+        .map(id => genreNamesMap[id])
+        .filter((g): g is string => g !== undefined);
+
+      const backdropUrl = item.backdrop_path 
+        ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}`
+        : "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=800&auto=format&fit=crop&q=60";
+
+      const synopsis = item.overview || "Geen beschrijving beschikbaar.";
+      const releaseYear = item.release_date ? item.release_date.split("-")[0] : "2026";
+      const originalLang = item.original_language || "en";
+      const languageName = LANGUAGE_MAP[originalLang] || originalLang.toUpperCase();
+
+      let actualProviders: string[] = selectedProviders;
+      let fetchedTrailerUrl: string | undefined = undefined;
+      let imdbId: string | undefined = undefined;
+
+      const detailsCacheKey = `tmdb_details_${item.id}`;
+      const cachedDetails = movieCache.get<CachedMovieDetails>(detailsCacheKey);
+
+      if (cachedDetails) {
+        imdbId = cachedDetails.imdbId;
+        fetchedTrailerUrl = cachedDetails.fetchedTrailerUrl;
+        const matchedProviders = selectedProviders.filter(p => {
+          if (p === "pirate") return true;
+          const matchId = PROVIDER_MAP[p];
+          return cachedDetails.offeredProviderIds.includes(matchId);
+        });
+        if (matchedProviders.length > 0) {
+          actualProviders = matchedProviders;
+        }
+      } else {
+        try {
+          const detailsRes = await fetch(
+            `https://api.themoviedb.org/3/movie/${item.id}?api_key=${tmdbKey}&append_to_response=watch/providers,videos,external_ids`
+          );
+          if (detailsRes.ok) {
+            const details = await detailsRes.json() as any;
+            imdbId = details.imdb_id || details.external_ids?.imdb_id || undefined;
+
+            const videos = details.videos?.results || [];
+            const trailer = videos.find((v: any) => v.site === "YouTube" && v.type === "Trailer") || 
+                            videos.find((v: any) => v.site === "YouTube" && v.type === "Teaser") ||
+                            videos.find((v: any) => v.site === "YouTube");
+            if (trailer?.key) {
+              fetchedTrailerUrl = `https://www.youtube.com/watch?v=${trailer.key}`;
+            }
+
+            const providerResults = details["watch/providers"]?.results || {};
+            const offeredProviderIds: number[] = [];
+            const targetRegions = [selectedCountry, "NL", "US"];
+            for (const region of targetRegions) {
+              const regionData = providerResults[region] || {};
+              const flatrate = regionData.flatrate || [];
+              const rent = regionData.rent || [];
+              const buy = regionData.buy || [];
+              const free = regionData.free || [];
+              const ads = regionData.ads || [];
+              const combined = [...flatrate, ...rent, ...buy, ...free, ...ads];
+              for (const p of combined) {
+                if (p.provider_id && !offeredProviderIds.includes(p.provider_id)) {
+                  offeredProviderIds.push(p.provider_id);
+                }
+              }
+            }
+
+            movieCache.set(detailsCacheKey, {
+              imdbId,
+              fetchedTrailerUrl,
+              offeredProviderIds
+            });
+
+            const matchedProviders = selectedProviders.filter(p => {
+              if (p === "pirate") return true;
+              const matchId = PROVIDER_MAP[p];
+              return offeredProviderIds.includes(matchId);
+            });
+            if (matchedProviders.length > 0) {
+              actualProviders = matchedProviders;
+            }
+          }
+        } catch (err) {
+          console.error(`Error querying detail extensions for recommended movie ${item.id}:`, err);
+        }
+      }
+
+      const fallbackTrailer = `https://www.youtube.com/results?search_query=${encodeURIComponent(item.title + " " + releaseYear + " trailer NL")}`;
+      const trailerUrl = fetchedTrailerUrl || fallbackTrailer;
+
+      let finalRating = Number((item.vote_average || 0).toFixed(1));
+      let ratingSource = "TMDB";
+
+      if (imdbId) {
+        const omdbResult = await getOmdbRating(imdbId);
+        if (omdbResult) {
+          finalRating = omdbResult.rating;
+          ratingSource = omdbResult.source;
+        }
+      }
+
+      return {
+        id: String(item.id),
+        title: item.title,
+        year: releaseYear,
+        rating: finalRating,
+        genres: itemGenres.length > 0 ? itemGenres : ["Film"],
+        synopsis: synopsis,
+        providers: actualProviders,
+        backdrop: backdropUrl,
+        trailerUrl,
+        language: languageName,
+        ratingSource,
+      };
+    });
+
+    const formattedMovies = await Promise.all(promises);
+
+    let filteredMovies = formattedMovies;
+    if (minRating !== undefined && minRating > 0) {
+      filteredMovies = filteredMovies.filter(m => m.rating >= minRating);
+    }
+    if (maxRating !== undefined && maxRating > 0) {
+      filteredMovies = filteredMovies.filter(m => m.rating <= maxRating);
+    }
+    if (minYear !== undefined && minYear > 0) {
+      filteredMovies = filteredMovies.filter(m => {
+        const yr = parseInt(m.year);
+        return isNaN(yr) || yr >= minYear;
+      });
+    }
+    if (maxYear !== undefined && maxYear > 0) {
+      filteredMovies = filteredMovies.filter(m => {
+        const yr = parseInt(m.year);
+        return isNaN(yr) || yr <= maxYear;
+      });
+    } else if (releaseDecade && releaseDecade !== "all") {
+      const decadeNum = parseInt(releaseDecade);
+      if (!isNaN(decadeNum)) {
+        filteredMovies = filteredMovies.filter(m => {
+          const yr = parseInt(m.year);
+          return isNaN(yr) || (yr >= decadeNum && yr <= decadeNum + 9);
+        });
+      }
+    }
+
+    if (minRuntime !== undefined && minRuntime > 0) {
+      // In recommendations we keep the full structured lists for safety or filter
+    }
+
+    const finalMovies = filteredMovies.slice(0, 20);
+    const moviesToReturn = finalMovies.length >= 3 ? finalMovies : formattedMovies.slice(0, 20);
+
+    return res.json({ source: "TMDB_RECOMMENDATIONS", movies: moviesToReturn });
+  } catch (error: any) {
+    console.error("Movie recommendations curation error:", error);
+    return res.status(500).json({ error: error.message || "An error occurred while curating recommended movies." });
   }
 });
 

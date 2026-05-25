@@ -339,7 +339,12 @@ export default function App() {
             });
 
             if (!alreadyMatched) {
-              await addMatchInFirestore(roomCode, movieId);
+              const fullMovie = room.movies.find((m) => m.id === movieId);
+              if (fullMovie) {
+                await addMatchInFirestore(roomCode, fullMovie);
+              } else {
+                await addMatchInFirestore(roomCode, movieId);
+              }
               toast.success("Match gevonden! 🎉", { icon: "🔥" });
             }
           }
@@ -377,8 +382,10 @@ export default function App() {
         toast.success(language === "nl" ? "Film verwijderd uit favorieten." : "Movie removed from favorites.");
       } else {
         // Multi-user mode: remove from matches array in Firestore
-        const currentRawMatches = (room.matches || []).map(m => typeof m === "string" ? m : m.id);
-        const updatedMatches = currentRawMatches.filter(id => id !== movieId);
+        const updatedMatches = (room.matches || []).filter((m) => {
+          const matchedId = typeof m === "string" ? m : m.id;
+          return matchedId !== movieId;
+        });
         
         await updateMatchesInFirestore(roomCode, updatedMatches);
         toast.success(language === "nl" ? "Film verwijderd uit matches voor iedereen." : "Movie removed from matches for everyone.");
@@ -464,6 +471,105 @@ export default function App() {
       console.error("Fout handmatig ophalen van nieuwe batch:", err);
       setErrorMsg(err.message || (language === "nl" ? "Er is een fout opgetreden bij het laden van een nieuwe filmstapel." : "An error occurred while loading a new movie deck."));
       toast.error(language === "nl" ? "Nieuwe batch laden is mislukt." : "Failed to load new batch.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFetchSimilarBatch = async () => {
+    if (!roomCode || !room) return;
+
+    const isSolo = Object.keys(room.users || {}).length < 2;
+    let seedMovies: Movie[] = [];
+    if (room.matches && room.matches.length > 0) {
+      seedMovies = room.matches;
+    } else if (isSolo && room.movies && room.swipes && user?.uid) {
+      const mySwipes = room.swipes[user.uid] || {};
+      seedMovies = room.movies.filter(m => mySwipes[m.id] === true);
+    }
+
+    if (seedMovies.length === 0) {
+      toast.error(
+        language === "nl"
+          ? "Je hebt ten minste één film-match of bewaarde film nodig om vergelijkbare films te kunnen zoeken!"
+          : "You need at least one movie match or saved movie to find similar films!"
+      );
+      return;
+    }
+
+    setLoading(true);
+    setErrorMsg(null);
+
+    try {
+      const swipedIds = new Set<string>();
+      if (room.swipes) {
+        Object.values(room.swipes).forEach((userSwipes: any) => {
+          if (userSwipes) {
+            Object.keys(userSwipes).forEach(movieId => swipedIds.add(String(movieId)));
+          }
+        });
+      }
+      if (room.movies) {
+        room.movies.forEach((m: any) => swipedIds.add(String(m.id)));
+      }
+      const excludeIds = Array.from(swipedIds).concat(seedMovies.map(m => String(m.id)));
+      const seedIds = seedMovies.map(m => String(m.id));
+
+      const res = await fetch("/api/recommendations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          movieIds: seedIds,
+          country: room.country || "NL",
+          providers: room.providers || ["netflix"],
+          maxRuntime: room.maxRuntime,
+          minRating: room.minRating,
+          releaseDecade: room.releaseDecade,
+          ageRating: room.ageRating,
+          excludeIds,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(
+          language === "nl"
+            ? `Mislukt om vergelijkbare films te zoeken: ${res.statusText}`
+            : `Failed to fetch similar movies: ${res.statusText}`
+        );
+      }
+
+      const rawData = await res.json();
+      const recommendedMovies: Movie[] = rawData.movies || [];
+
+      if (recommendedMovies.length > 0) {
+        const userIds = Object.keys(room.users || {});
+        // Load recommended movies, do NOT reset matches (resetMatches = false)
+        await loadNewBatchInFirestore(roomCode, userIds, recommendedMovies, false);
+        setSwipingStarted(true);
+        setActiveTab("swipe");
+        toast.success(
+          language === "nl"
+            ? `Succes! Een nieuwe stapel van ${recommendedMovies.length} vergelijkbare films is geladen!`
+            : `Success! A new stack of ${recommendedMovies.length} similar movies has been loaded!`
+        );
+      } else {
+        throw new Error(
+          language === "nl"
+            ? "Geen vergelijkbare films gevonden die voldoen aan de lobby-instellingen."
+            : "No similar movies found matching your active room filters."
+        );
+      }
+    } catch (err: any) {
+      console.error("Fout bij ophalen van vergelijkbare films:", err);
+      setErrorMsg(
+        err.message ||
+          (language === "nl"
+            ? "Er is een fout opgetreden bij het laden van vergelijkbare films."
+            : "An error occurred while loading recommended movies.")
+      );
+      toast.error(
+        language === "nl" ? "Vergelijkbare films laden mislukt." : "Failed to load similar movies."
+      );
     } finally {
       setLoading(false);
     }
@@ -681,6 +787,7 @@ export default function App() {
               onResetDeck={handleResetDeck}
               onFetchNewBatch={handleFetchNewBatch}
               onGoToMatches={() => setActiveTab("matches")}
+              onFetchSimilarBatch={handleFetchSimilarBatch}
             />
           ) : (
             <MatchesScreen
@@ -691,6 +798,7 @@ export default function App() {
               isSolo={isSolo}
               onRemoveMatch={handleRemoveMatch}
               onToggleSuperLike={handleToggleSuperLike}
+              onFetchSimilarBatch={handleFetchSimilarBatch}
             />
           )
         )}

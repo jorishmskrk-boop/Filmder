@@ -14,6 +14,7 @@ interface SwipeScreenProps {
   onResetDeck: () => void;
   onFetchNewBatch: () => void;
   onGoToMatches?: () => void;
+  onFetchSimilarBatch?: () => void;
 }
 
 const REACTION_MAP: Record<string, { label: string; labelEn: string; color: string }> = {
@@ -32,6 +33,7 @@ export default function SwipeScreen({
   onResetDeck,
   onFetchNewBatch,
   onGoToMatches,
+  onFetchSimilarBatch,
 }: SwipeScreenProps) {
   const { language, t } = useLanguage();
 
@@ -301,6 +303,17 @@ export default function SwipeScreen({
                       <RefreshCw className="w-3.5 h-3.5 animate-spin-reverse" />
                       {language === "nl" ? "Geziene films herhalen" : "Reload watched movies"}
                     </button>
+                    {displayMatches.length > 0 && onFetchSimilarBatch && (
+                      <button
+                        id="fetch-similar-deck-btn"
+                        onClick={onFetchSimilarBatch}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold bg-[#ff5637]/15 hover:bg-[#ff5637]/25 border border-[#ff5637]/45 text-[#ffdb3c] rounded-xl cursor-pointer transition-all shadow-md active:scale-95 focus-visible:ring-2 focus-visible:ring-[#ff5637] focus:outline-none"
+                        title={language === "nl" ? "Maak een nieuwe filmstapel gebaseerd op je matches" : "Create a new movie stack based on your matches"}
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-[#ffdb3c] animate-pulse" />
+                        {language === "nl" ? "Vind vergelijkbare films" : "Find similar movies"}
+                      </button>
+                    )}
                     <button
                       id="fetch-new-deck-btn"
                       onClick={onFetchNewBatch}
