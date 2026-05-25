@@ -210,212 +210,117 @@ app.post("/api/movies", movieLimiter, async (req, res) => {
 
     const genresString = selectedVibe.trim() ? selectedVibe.trim().replace(/,/g, "|") : "";
 
-    // Helper to generate 3 diverse movie recipes
-    const getRecipes = (level: number) => {
-      const list: Array<{
-        sort: string;
-        custom: string;
-        genres: string;
-        providers: string;
-      }> = [];
+    // Calculate a dynamic upper bound for pagination
+    let safeMaxPage = 20;
+    if (hasUserYearFilter || hasUserGenreFilter) {
+      safeMaxPage = 3;
+    } else if (providerIdString.length > 0) {
+      safeMaxPage = 10;
+    }
 
-      // Recipe 1: Modern Blockbusters & High-energy cinema (Action, Adventure, Sci-Fi, Thriller)
-      let r1Genres = genresString;
-      if (level === 0 && !hasUserGenreFilter) {
-        r1Genres = "28|12|878|53";
-      }
-      let r1Custom = "";
-      if (level === 0) {
-        r1Custom = "&vote_count.gte=300";
-        if (!hasUserYearFilter) {
-          r1Custom += "&primary_release_date.gte=2012-01-01";
+    // Build the query URLs
+    const baseQuery = `https://api.themoviedb.org/3/discover/movie?api_key=${tmdbKey}&watch_region=${selectedCountry}`;
+    const providerFilter = providerIdString ? `&with_watch_providers=${providerIdString}` : "";
+    const genreFilter = genresString ? `&with_genres=${genresString}` : "";
+
+    // Query 1 (Random Year Era)
+    const randomYear = Math.floor(Math.random() * (2023 - 1985 + 1)) + 1985;
+    const page1 = Math.floor(Math.random() * 3) + 1;
+    const q1Custom = appendUserFilters(`&primary_release_year=${randomYear}&sort_by=popularity.desc&vote_count.gte=300`);
+    const url1 = `${baseQuery}&page=${page1}${q1Custom}${providerFilter}${genreFilter}`;
+
+    // Query 2 (Random Sort Method)
+    const sorts = ["revenue.desc", "vote_count.desc", "popularity.desc"];
+    const selectedSort = sorts[Math.floor(Math.random() * sorts.length)];
+    const page2 = Math.floor(Math.random() * safeMaxPage) + 1;
+    const q2Custom = appendUserFilters(`&sort_by=${selectedSort}&vote_count.gte=400`);
+    const url2 = `${baseQuery}&page=${page2}${q2Custom}${providerFilter}${genreFilter}`;
+
+    // Query 3 (Blind Genre Injection / Cult Classics)
+    const page3 = Math.floor(Math.random() * safeMaxPage) + 1;
+    const q3Custom = appendUserFilters("&sort_by=vote_average.desc&vote_average.gte=6.5&vote_count.gte=200&vote_count.lte=3000");
+    let url3 = "";
+    if (!hasUserGenreFilter) {
+      // Expanded list of TMDB genre IDs to force dynamic genre variations
+      const secondaryGenres = [28, 12, 16, 35, 80, 99, 18, 10751, 14, 36, 27, 10402, 9648, 10749, 878, 53, 10752, 37];
+      // Shuffle the genres and take a random number of them (between 1 and 3)
+      const shuffledGenres = [...secondaryGenres].sort(() => 0.5 - Math.random());
+      const numGenres = Math.floor(Math.random() * 3) + 1; // Pick 1, 2 or 3 random genres
+      const selectedCombo = shuffledGenres.slice(0, numGenres).join("|");
+      url3 = `${baseQuery}&page=${page3}${q3Custom}${providerFilter}&with_genres=${selectedCombo}`;
+    } else {
+      url3 = `${baseQuery}&page=${page3}${q3Custom}${providerFilter}${genreFilter}`;
+    }
+
+    // Helper to fetch and return tmdb items safely
+    const fetchQuery = async (url: string): Promise<TMDBItem[]> => {
+      try {
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json() as TMDBResponse;
+          return data.results || [];
         }
-      } else if (level === 1) {
-        r1Custom = "&vote_count.gte=150";
+      } catch (err) {
+        console.error(`Error fetching movie query url (${url}):`, err);
       }
-      r1Custom = appendUserFilters(r1Custom);
-
-      list.push({
-        sort: "popularity.desc",
-        custom: r1Custom,
-        genres: r1Genres,
-        providers: level >= 4 ? "" : providerIdString
-      });
-
-      // Recipe 2: Critical Masterpieces, Cinematic Gems & Classics (Drama, Mystery, History, Crime, Documentary)
-      let r2Genres = genresString;
-      if (level === 0 && !hasUserGenreFilter) {
-        r2Genres = "18|9648|36|80|99";
-      }
-      let r2Custom = "";
-      if (level === 0) {
-        r2Custom = "&vote_count.gte=180";
-        if (!hasUserYearFilter) {
-          r2Custom += "&primary_release_date.gte=1980-01-01&primary_release_date.lte=2011-12-31";
-        }
-      } else if (level === 1) {
-        r2Custom = "&vote_count.gte=90";
-      }
-      r2Custom = appendUserFilters(r2Custom);
-
-      list.push({
-        sort: "vote_average.desc",
-        custom: r2Custom,
-        genres: r2Genres,
-        providers: level >= 4 ? "" : providerIdString
-      });
-
-      // Recipe 3: Feel-Good, Fun, Family & Nostalgic Wildcard (Comedy, Romance, Animation, Family, Fantasy)
-      let r3Genres = genresString;
-      if (level === 0 && !hasUserGenreFilter) {
-        r3Genres = "35|10749|16|10751|14";
-      }
-      let r3Custom = "";
-      if (level === 0) {
-        r3Custom = "&vote_count.gte=120";
-        if (!hasUserYearFilter) {
-          r3Custom += "&primary_release_date.gte=1960-01-01&primary_release_date.lte=2015-12-31";
-        }
-      } else if (level === 1) {
-        r3Custom = "&vote_count.gte=60";
-      }
-      r3Custom = appendUserFilters(r3Custom);
-
-      list.push({
-        sort: Math.random() > 0.5 ? "revenue.desc" : "vote_count.desc",
-        custom: r3Custom,
-        genres: r3Genres,
-        providers: level >= 4 ? "" : providerIdString
-      });
-
-      // Adjust configurations for higher fallback levels
-      if (level >= 2) {
-        // Fallback Level 2: Wipe all automated curation genres and eras completely (reverting strictly to user selections)
-        list.forEach((recipe, idx) => {
-          recipe.genres = genresString;
-          let baseCustom = "";
-          if (idx === 0) {
-            recipe.sort = "popularity.desc";
-            baseCustom = "&vote_count.gte=100";
-          } else if (idx === 1) {
-            recipe.sort = "vote_average.desc";
-            baseCustom = "&vote_count.gte=80";
-          } else {
-            recipe.sort = "vote_count.desc";
-            baseCustom = "&vote_count.gte=60";
-          }
-          recipe.custom = appendUserFilters(baseCustom);
-        });
-      }
-
-      if (level >= 3) {
-        // Fallback Level 3: Wipe advanced user rating / runtime ceilings to guarantee results
-        list.forEach((recipe) => {
-          recipe.custom = "";
-          recipe.genres = "";
-        });
-      }
-
-      return list;
+      return [];
     };
 
+    // Parallel execution
+    const resultsArrays = await Promise.all([
+      fetchQuery(url1),
+      fetchQuery(url2),
+      fetchQuery(url3)
+    ]);
+
+    // Data Processing & Deduplication
+    const seenIds = new Set<number>();
     let rawResults: TMDBItem[] = [];
-    let fallbackLevel = 0;
-    let activeFallbackLevel = 0;
 
-    // Use a multi-tier fallback system to avoid zero-results crashes if filters are too restrictive
-    while (rawResults.length < 5 && fallbackLevel <= 4) {
-      const activeRecipes = getRecipes(fallbackLevel);
-
-      const hasProviders = providerIdString.length > 0;
-      let safeMaxPage = hasProviders ? 4 : 12;
-      if (fallbackLevel === 1) {
-        safeMaxPage = hasProviders ? 2 : 6;
-      } else if (fallbackLevel >= 2) {
-        safeMaxPage = 2;
-      }
-      if (safeMaxPage < 1) safeMaxPage = 1;
-
-      // Select randomized page index for each active recipe in parallel
-      const fetchPromises = activeRecipes.map(async (recipe) => {
-        const pageNum = Math.floor(Math.random() * safeMaxPage) + 1;
-        let pageUrl = `https://api.themoviedb.org/3/discover/movie?api_key=${tmdbKey}&watch_region=${selectedCountry}&sort_by=${recipe.sort}&page=${pageNum}${recipe.custom}`;
-        if (recipe.providers) {
-          pageUrl += `&with_watch_providers=${recipe.providers}`;
-        }
-        if (recipe.genres) {
-          pageUrl += `&with_genres=${recipe.genres}`;
-        }
-
-        try {
-          const pageRes = await fetch(pageUrl);
-          if (pageRes.ok) {
-            const data = await pageRes.json() as TMDBResponse;
-            if (data.results && data.results.length > 0) {
-              return data.results;
-            }
-          }
-        } catch (err) {
-          console.error(`Error fetching page ${pageNum} for recipe sort ${recipe.sort}:`, err);
-        }
-
-        // Bisection fallback: if a deep randomized page turns up empty (due to restrictive watch providers), try page 1
-        if (pageNum > 1) {
-          let fallbackUrl = `https://api.themoviedb.org/3/discover/movie?api_key=${tmdbKey}&watch_region=${selectedCountry}&sort_by=${recipe.sort}&page=1${recipe.custom}`;
-          if (recipe.providers) {
-            fallbackUrl += `&with_watch_providers=${recipe.providers}`;
-          }
-          if (recipe.genres) {
-            fallbackUrl += `&with_genres=${recipe.genres}`;
-          }
-          try {
-            const pageRes = await fetch(fallbackUrl);
-            if (pageRes.ok) {
-              const data = await pageRes.json() as TMDBResponse;
-              return data.results || [];
-            }
-          } catch (err) {
-            console.error(`Error in page 1 fallback for recipe sort ${recipe.sort}:`, err);
-          }
-        }
-        return [];
-      });
-
-      try {
-        let levelResults: TMDBItem[] = [];
-        const resultsArrays = await Promise.all(fetchPromises);
-        resultsArrays.forEach(arr => {
-          levelResults = levelResults.concat(arr);
-        });
-
-        if (levelResults.length > 0) {
-          // De-duplicate items by TMDB ID AND filter out already excluded / swiped movies!
-          const seenIds = new Set<number>();
-          rawResults = levelResults.filter(item => {
-            const idStr = String(item.id);
-            if (seenIds.has(item.id)) return false;
-            if (excludeIds.includes(idStr)) return false;
+    for (const arr of resultsArrays) {
+      for (const item of arr) {
+        if (item && item.id) {
+          const idStr = String(item.id);
+          if (!seenIds.has(item.id) && !excludeIds.includes(idStr)) {
             seenIds.add(item.id);
-            return true;
-          });
-          if (rawResults.length >= 5) {
-            activeFallbackLevel = fallbackLevel;
+            rawResults.push(item);
+          }
+        }
+      }
+    }
+
+    // Fail-Safe Fallback
+    let activeFallbackLevel = 0;
+    if (rawResults.length < 5) {
+      activeFallbackLevel = 1;
+      const fallbackUrl = `${baseQuery}&sort_by=popularity.desc&page=1&vote_count.gte=50${providerFilter}`;
+      try {
+        const fbRes = await fetch(fallbackUrl);
+        if (fbRes.ok) {
+          const fbData = await fbRes.json() as TMDBResponse;
+          const fbResults = fbData.results || [];
+          for (const item of fbResults) {
+            if (item && item.id) {
+              const idStr = String(item.id);
+              if (!seenIds.has(item.id) && !excludeIds.includes(idStr)) {
+                seenIds.add(item.id);
+                rawResults.push(item);
+              }
+            }
           }
         }
       } catch (err) {
-        console.error(`Error in movie fetching retry fallback level ${fallbackLevel}:`, err);
+        console.error("Error fetching fallback query:", err);
       }
-
-      fallbackLevel++;
     }
 
-    // Fisher-Yates shuffle the consolidated array to randomize the deck every single session
+    // Final Randomization (Fisher-Yates shuffle)
     for (let i = rawResults.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [rawResults[i], rawResults[j]] = [rawResults[j], rawResults[i]];
     }
 
-    // Use a slightly larger pool of candidates so we can satisfy strict IMDb rating filters and still build a 20-movie deck
+    // Pool to max 35 items
     const items = rawResults.slice(0, 35);
 
     // Map TMDB genres to Dutch
