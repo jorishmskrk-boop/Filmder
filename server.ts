@@ -258,10 +258,27 @@ app.post("/api/movies", movieLimiter, async (req, res) => {
         const res = await fetch(url);
         if (res.ok) {
           const data = await res.json() as TMDBResponse;
-          return data.results || [];
+          const results = data.results || [];
+          if (results.length > 0) {
+            return results;
+          }
         }
       } catch (err) {
         console.error(`Error fetching movie query url (${url}):`, err);
+      }
+
+      // If page is greater than 1, and we got 0 results (or failed), attempt page 1 fallback for this EXACT query
+      if (url.includes("&page=") && !url.includes("&page=1")) {
+        const fallbackUrl = url.replace(/&page=\d+/, "&page=1");
+        try {
+          const res = await fetch(fallbackUrl);
+          if (res.ok) {
+            const data = await res.json() as TMDBResponse;
+            return data.results || [];
+          }
+        } catch (err) {
+          console.error(`Error fetching fallback page 1 for (${fallbackUrl}):`, err);
+        }
       }
       return [];
     };
