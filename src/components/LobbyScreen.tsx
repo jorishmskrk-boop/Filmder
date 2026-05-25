@@ -23,7 +23,11 @@ export default function LobbyScreen({ room, currentUserId, onStartSwiping, onLea
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const usersList = Object.entries(room.users || {});
+  const usersList = Object.entries(room.users || {}).sort(([uidA], [uidB]) => {
+    if (uidA === currentUserId && uidB !== currentUserId) return -1;
+    if (uidA !== currentUserId && uidB === currentUserId) return 1;
+    return uidA.localeCompare(uidB);
+  });
   const hasPartner = usersList.length >= 2;
 
   return (

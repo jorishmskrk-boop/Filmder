@@ -650,8 +650,15 @@ export default function App() {
 
               {/* Overlapping player avatar roundels */}
               <div className="flex -space-x-1.5 shrink-0">
-                {Object.entries(room.users || {}).map(([uid, name]) => {
-                  const isMe = uid === user?.uid;
+                {Object.entries(room.users || {})
+                  .sort(([uidA], [uidB]) => {
+                    const myUid = user?.uid;
+                    if (uidA === myUid && uidB !== myUid) return -1;
+                    if (uidA !== myUid && uidB === myUid) return 1;
+                    return uidA.localeCompare(uidB);
+                  })
+                  .map(([uid, name]) => {
+                    const isMe = uid === user?.uid;
                   const displayName = String(name || "User");
                   return (
                     <div

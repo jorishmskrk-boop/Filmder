@@ -380,6 +380,8 @@ app.post("/api/movies", movieLimiter, async (req, res) => {
         });
         if (matchedProviders.length > 0) {
           actualProviders = matchedProviders;
+        } else if (!includesPirate) {
+          actualProviders = [];
         }
       } else {
         try {
@@ -442,6 +444,8 @@ app.post("/api/movies", movieLimiter, async (req, res) => {
             
             if (matchedProviders.length > 0) {
               actualProviders = matchedProviders;
+            } else if (!includesPirate) {
+              actualProviders = [];
             }
           }
         } catch (err) {
@@ -479,7 +483,8 @@ app.post("/api/movies", movieLimiter, async (req, res) => {
       };
     });
 
-    const formattedMovies = await Promise.all(promises);
+    const allFormattedMovies = await Promise.all(promises);
+    const formattedMovies = includesPirate ? allFormattedMovies : allFormattedMovies.filter(m => m.providers.length > 0);
 
     // Apply strict final-rating (IMDb or TMDB fallback score) selection
     let filteredMovies = formattedMovies;
@@ -532,6 +537,7 @@ app.post("/api/recommendations", movieLimiter, async (req, res) => {
     const sourceMovieIdsSet = new Set(movieIds.map(id => String(id)));
 
     const selectedProviders: string[] = providers || ["netflix"];
+    const includesPirate = selectedProviders.includes("pirate");
     const selectedCountry = country || "NL";
 
     const serverTmdbKey = process.env.TMDB_API_KEY;
@@ -603,7 +609,17 @@ app.post("/api/recommendations", movieLimiter, async (req, res) => {
       return (itemsMap[b].vote_average || 0) - (itemsMap[a].vote_average || 0);
     });
 
-    const items = candidateIds.slice(0, 35).map(id => itemsMap[id]);
+    // Take the top 45 highly correlated recommendation candidates
+    const topCandidates = candidateIds.slice(0, 45).map(id => itemsMap[id]);
+
+    // Perform a Fisher-Yates shuffle to randomize the movie deck order and choice selection
+    for (let i = topCandidates.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [topCandidates[i], topCandidates[j]] = [topCandidates[j], topCandidates[i]];
+    }
+
+    // Capture the top 30 elements to fetch details for and display
+    const items = topCandidates.slice(0, 30);
 
     const genreNamesMap: Record<number, string> = {
       28: "Actie", 12: "Avontuur", 16: "Animatie", 35: "Komedie", 80: "Misdaad",
@@ -644,6 +660,8 @@ app.post("/api/recommendations", movieLimiter, async (req, res) => {
         });
         if (matchedProviders.length > 0) {
           actualProviders = matchedProviders;
+        } else if (!includesPirate) {
+          actualProviders = [];
         }
       } else {
         try {
@@ -693,6 +711,8 @@ app.post("/api/recommendations", movieLimiter, async (req, res) => {
             });
             if (matchedProviders.length > 0) {
               actualProviders = matchedProviders;
+            } else if (!includesPirate) {
+              actualProviders = [];
             }
           }
         } catch (err) {
@@ -729,7 +749,8 @@ app.post("/api/recommendations", movieLimiter, async (req, res) => {
       };
     });
 
-    const formattedMovies = await Promise.all(promises);
+    const allFormattedMovies = await Promise.all(promises);
+    const formattedMovies = includesPirate ? allFormattedMovies : allFormattedMovies.filter(m => m.providers.length > 0);
 
     let filteredMovies = formattedMovies;
     if (minRating !== undefined && minRating > 0) {

@@ -69,6 +69,32 @@ export default function SwipeScreen({
     ? (room.movies || []).filter(m => mySwipes[m.id] === true)
     : (room.matches || []);
 
+  // List of all players with their respective swipe progress, sorted stably
+  const allUsersWithProgress = Object.entries(room.users || {}).map(([uid, name]) => {
+    const userSwipes = room.swipes?.[uid] || {};
+    const swipedMoviesCount = currentMovies.filter(m => userSwipes[m.id] !== undefined).length;
+    const isFinished = currentMovies.length > 0 && swipedMoviesCount === currentMovies.length;
+    const percentage = currentMovies.length > 0 ? Math.round((swipedMoviesCount / currentMovies.length) * 100) : 0;
+    const recentReaction = room.reactions?.[uid];
+    
+    return {
+      uid,
+      name,
+      swipedMoviesCount,
+      totalCount: currentMovies.length,
+      isFinished,
+      percentage,
+      isSelf: uid === currentUserId,
+      recentReaction: recentReaction && (Date.now() - recentReaction.timestamp < 15000) ? recentReaction : null,
+    };
+  }).sort((a, b) => {
+    // Current user always goes first
+    if (a.isSelf && !b.isSelf) return -1;
+    if (!a.isSelf && b.isSelf) return 1;
+    // Otherwise, sort stably by UID
+    return a.uid.localeCompare(b.uid);
+  });
+
   // Reaction display state
   const [partnerReaction, setPartnerReaction] = useState<{ label: string; text: string } | null>(null);
   const activeReactionTimer = useRef<NodeJS.Timeout | null>(null);
@@ -257,6 +283,8 @@ export default function SwipeScreen({
                   onSwipe={onSwipe}
                   swipeDirection={swipeDirection}
                   setSwipeDirection={setSwipeDirection}
+                  room={room}
+                  currentUserId={currentUserId}
                 />
               ) : (
                 // Deck empty fallback view
@@ -294,6 +322,42 @@ export default function SwipeScreen({
                       )}
                     </p>
                   </div>
+
+                  {partnerId && !partnerFinished && (
+                    <div className="p-4 rounded-2xl bg-black/45 border border-white/5 max-w-sm w-full space-y-3.5 mt-2 shadow-inner text-left">
+                      <div className="border-b border-white/5 pb-1.5 flex justify-between items-center">
+                        <span className="text-[10px] text-slate-450 uppercase tracking-widest block font-extrabold font-mono">
+                          {language === "nl" ? "Wacht-Voortgang" : "Waiting Progress"}
+                        </span>
+                        <span className="text-[9px] text-[#ffdb3c] font-black uppercase inline-block animate-pulse">
+                          {language === "nl" ? "Wachten..." : "Waiting..."}
+                        </span>
+                      </div>
+                      <div className="space-y-3">
+                        {allUsersWithProgress.filter(p => !p.isSelf).map(p => (
+                          <div key={p.uid} className="space-y-1.5 text-left">
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="text-slate-200 font-bold">{p.name}</span>
+                              <span className="text-[#ff5637] font-extrabold font-mono">
+                                {p.swipedMoviesCount} / {p.totalCount} ({p.percentage}%)
+                              </span>
+                            </div>
+                            <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-white/5 relative">
+                              <motion.div
+                                initial={{ width: 0 }}
+                                animate={{ width: `${p.percentage}%` }}
+                                transition={{ duration: 0.5 }}
+                                className="h-full bg-gradient-to-r from-orange-600 to-[#ff5637] rounded-full"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-slate-400 font-medium italic text-center pt-1">
+                        {language === "nl" ? "Tip: Plaag of help je partner door reacties te sturen!" : "Tip: Playfully nudge or cheer your partner by sending reactions!"}
+                      </p>
+                    </div>
+                  )}
                   <div className="flex flex-col sm:flex-row gap-3">
                     <button
                       id="reset-deck-btn"
@@ -382,43 +446,106 @@ export default function SwipeScreen({
         {/* Right Column: Immersive Info & Activity Sidebar */}
         <aside className="flex-1 flex flex-col gap-6 justify-between lg:max-w-xs xl:max-w-sm w-full">
           
-          {/* Live Activity Card */}
-          <div className="glass-card rounded-3xl p-6 shadow-sm flex flex-col justify-center border border-white/5">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">
-              {language === "nl" ? "Live Status" : "Live Status"}
-            </h3>
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#ff5637] to-[#ba1c00] flex items-center justify-center text-white select-none border border-white/10">
-                  <User className="w-5 h-5 text-white" />
-                </div>
-                <div className={`absolute -bottom-1 -right-1 w-5 h-5 border-2 border-[#12121d] rounded-full ${otherUsers.length > 0 ? "bg-[#ffdb3c]" : "bg-neutral-800"}`}></div>
-              </div>
-              <div>
-                <p className="text-sm font-bold text-white leading-tight">
-                  {otherUsers.length > 0 
-                    ? (otherUsers.length === 1 ? partnerName : (language === "nl" ? `${otherUsers.length} Medespelers` : `${otherUsers.length} Other Players`)) 
-                    : (language === "nl" ? "Alleen Swipen" : "Swiping Solo")}
-                </p>
-                <div className="text-xs text-slate-400 mt-1">
-                  {otherUsers.length === 1 ? (
-                    room.reactions?.[partnerId] ? (
-                      language === "nl" 
-                        ? `Reageerde met "${REACTION_MAP[room.reactions[partnerId].emoji]?.label || room.reactions[partnerId].emoji}"`
-                        : `Reacted with "${REACTION_MAP[room.reactions[partnerId].emoji]?.labelEn || room.reactions[partnerId].emoji}"`
-                    ) : (
-                      language === "nl" ? "Swipet door de catalogus..." : "Swiping through catalog..."
-                    )
-                  ) : otherUsers.length > 1 ? (
-                    language === "nl"
-                      ? `${finishedOthersCount}/${totalOtherUsersCount} spelers klaar!`
-                      : `${finishedOthersCount}/${totalOtherUsersCount} players finished!`
-                  ) : (
-                    language === "nl" ? "Nodig je vrienden uit!" : "Invite your friends!"
-                  )}
-                </div>
-              </div>
+          {/* Group Progress Dashboard */}
+          <div className="glass-card rounded-3xl p-5 border border-white/5 space-y-4">
+            <div className="flex items-center justify-between border-b border-white/5 pb-2">
+              <h3 className="text-xs font-bold text-slate-350 uppercase tracking-widest flex items-center gap-1.5 font-display">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse animate-duration-1000" />
+                {language === "nl" ? "Groepsstatus" : "Group Status"}
+              </h3>
+              <span className="text-[10px] bg-slate-900 text-[#ffb4a5] px-2.5 py-0.5 rounded-full font-mono font-bold border border-[#ff5637]/15">
+                {currentMovies.length} {language === "nl" ? "films" : "movies"}
+              </span>
             </div>
+
+            <div className="space-y-3">
+              {allUsersWithProgress.map((player) => (
+                <div 
+                  key={player.uid} 
+                  className={`p-2.5 rounded-2xl border transition-all ${
+                    player.isSelf 
+                      ? "bg-[#ff5637]/5 border-[#ff5637]/25 shadow-[0_2px_10px_rgba(255,86,55,0.05)]" 
+                      : "bg-black/10 border-white/5"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2.5 mb-1.5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="relative shrink-0">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black uppercase text-white ${
+                          player.isSelf 
+                            ? "bg-gradient-to-br from-[#ff5637] to-[#ba1c00]" 
+                            : "bg-slate-800 border border-white/10"
+                        }`}>
+                          {player.name ? player.name.slice(0, 2) : "SP"}
+                        </div>
+                        {player.recentReaction && (
+                          <span className="absolute -top-1 -right-1 text-sm bg-black/85 rounded-full w-5 h-5 flex items-center justify-center animate-bounce border border-white/15">
+                            {player.recentReaction.emoji}
+                          </span>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-[#e3e0f1] truncate flex items-center gap-1">
+                          {player.name}
+                          {player.isSelf && (
+                            <span className="text-[9px] text-slate-400 bg-slate-900 border border-white/10 px-1 py-0.2 rounded shrink-0 leading-normal font-sans">
+                              ({language === "nl" ? "jij" : "you"})
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-[10px] text-slate-450 font-sans tracking-wide">
+                          {player.isFinished ? (
+                            <span className="text-emerald-400 font-bold flex items-center gap-1">
+                              ✓ {language === "nl" ? "Klaar! 🏁" : "Finished! 🏁"}
+                            </span>
+                          ) : (
+                            <span>
+                              {language === "nl" 
+                                ? `Nog ${player.totalCount - player.swipedMoviesCount} keuzes 🍿` 
+                                : `Remaining ${player.totalCount - player.swipedMoviesCount} is 🍿`}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className="text-xs font-black text-white font-mono block">
+                        {player.swipedMoviesCount}/{player.totalCount}
+                      </span>
+                      <span className="text-[9px] text-slate-400 font-bold font-mono">
+                        {player.percentage}%
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Visual tracking slider */}
+                  <div className="w-full bg-slate-900/80 h-2 rounded-full overflow-hidden border border-white/5 relative">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${player.percentage}%` }}
+                      transition={{ duration: 0.5, ease: "easeOut" }}
+                      className={`h-full rounded-full ${
+                        player.isFinished
+                          ? "bg-gradient-to-r from-emerald-500 to-teal-400 shadow-[0_0_8px_rgba(16,185,129,0.3)]"
+                          : "bg-gradient-to-r from-[#ba1c00] to-[#ff5637]"
+                      }`}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Solo player prompt to invite friends */}
+            {isSolo && (
+              <div className="p-3 rounded-2xl bg-black/35 border border-dashed border-white/10 text-center space-y-1.5 mt-2">
+                <p className="text-[10px] text-slate-400 leading-relaxed">
+                  {language === "nl" 
+                    ? "Alleen aan het swipen? Deel je kamercode hierboven om samen keuzes te maken!" 
+                    : "Swiping solo? Share your room code above to start swipe-matching together!"}
+                </p>
+              </div>
+            )}
           </div>
 
 
@@ -560,6 +687,8 @@ interface CinephileCardProps {
   onSwipe: (movieId: string, liked: boolean) => void;
   swipeDirection: "like" | "dislike" | null;
   setSwipeDirection: (direction: "like" | "dislike" | null) => void;
+  room: Room;
+  currentUserId: string;
 }
 
 // 1. Memoize CinephileCard with React.memo to avoid redundant heavy re-renders in card stack
@@ -568,8 +697,16 @@ const CinephileCard = memo(function CinephileCard({
   onSwipe,
   swipeDirection,
   setSwipeDirection,
+  room,
+  currentUserId,
 }: CinephileCardProps) {
   const { language } = useLanguage();
+  
+  // Real-time vote synchronization details
+  const otherUsers = Object.entries(room.users || {}).filter(([uid]) => uid !== currentUserId);
+  const swipedOthers = otherUsers.filter(([uid]) => room.swipes?.[uid]?.[movie.id] !== undefined);
+  const isLastVote = otherUsers.length > 0 && swipedOthers.length === otherUsers.length;
+
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-25, 25]);
   const opacity = useTransform(x, [-200, -150, 0, 150, 200], [0.5, 1, 1, 1, 0.5]);
@@ -626,6 +763,34 @@ const CinephileCard = memo(function CinephileCard({
       >
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent"></div>
       </div>
+
+      {/* Multi-user Vote Sync Badge Tag */}
+      {otherUsers.length > 0 && (
+        <div className="absolute top-5 left-5 right-5 z-20 flex justify-between items-center pointer-events-none select-none">
+          <div className={`px-2.5 py-1.5 rounded-2xl text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wide flex items-center gap-1.5 backdrop-blur-md border shadow-md ${
+            isLastVote 
+              ? "bg-amber-500/15 border-amber-500/40 text-amber-300 shadow-[0_4px_16px_rgba(245,158,11,0.25)] animate-pulse" 
+              : swipedOthers.length > 0
+                ? "bg-emerald-500/15 border-emerald-500/45 text-emerald-300 shadow-[0_4px_14px_rgba(16,185,129,0.15)]"
+                : "bg-black/65 border-white/10 text-slate-400"
+          }`}>
+            <span className={`w-2 h-2 rounded-full ${
+              isLastVote ? "bg-amber-400 animate-ping" : swipedOthers.length > 0 ? "bg-emerald-450 animate-pulse" : "bg-slate-550"
+            }`} />
+            <span>
+              {isLastVote ? (
+                language === "nl" ? "Laatste Beslissing! 🔥" : "Last Decision! 🔥"
+              ) : swipedOthers.length > 0 ? (
+                language === "nl" 
+                  ? `${swipedOthers.map(([_, name]) => name).join(", ")} heeft al gestemd ✓` 
+                  : `${swipedOthers.map(([_, name]) => name).join(", ")} swiped ✓`
+              ) : (
+                language === "nl" ? "Wachten op stemmen... ⏳" : "Waiting for votes... ⏳"
+              )}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* LIKE Badge Stamp Overlay */}
       <motion.div
