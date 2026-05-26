@@ -10,6 +10,7 @@ export interface Movie {
   trailerUrl?: string; // Optional YouTube trailer URL or link
   language?: string;   // Human-readable language of the movie, e.g. "Engels", "Nederlands", "Frans"
   ratingSource?: string; // e.g. "IMDb" or "TMDB"
+  recommendedFrom?: string[]; // Titles of the seed movies that recommended this film
 }
 
 export interface Room {

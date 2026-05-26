@@ -348,6 +348,31 @@ export default function App() {
               toast.success("Match gevonden! 🎉", { icon: "🔥" });
             }
           }
+        } else {
+          // Solo mode: persist liked movie into room.matches so it is kept even when loading a new deck/batch of recommended movies
+          const alreadyMatched = (room.matches || []).some((m) => {
+            const matchedId = typeof m === "string" ? m : m.id;
+            return matchedId === movieId;
+          });
+
+          if (!alreadyMatched) {
+            const fullMovie = room.movies?.find((m) => m.id === movieId);
+            if (fullMovie) {
+              await addMatchInFirestore(roomCode, fullMovie);
+            } else {
+              await addMatchInFirestore(roomCode, movieId);
+            }
+          }
+        }
+      } else {
+        // If swiped left (liked: false) and they are solo, ensure any swipe-left removes the movie from room.matches
+        const userIds = Object.keys(room.users || {});
+        if (userIds.length < 2) {
+          const updatedMatches = (room.matches || []).filter((m) => {
+            const matchedId = typeof m === "string" ? m : m.id;
+            return matchedId !== movieId;
+          });
+          await updateMatchesInFirestore(roomCode, updatedMatches);
         }
       }
     } catch (err) {
@@ -377,8 +402,13 @@ export default function App() {
 
     try {
       if (isSolo) {
-        // Solo mode: remove from favorites by setting swipe to false
+        // Solo mode: remove from favorites by setting swipe to false and deleting from matches array
         await swipeMovieInFirestore(roomCode, user.uid, movieId, false);
+        const updatedMatches = (room.matches || []).filter((m) => {
+          const matchedId = typeof m === "string" ? m : m.id;
+          return matchedId !== movieId;
+        });
+        await updateMatchesInFirestore(roomCode, updatedMatches);
         toast.success(language === "nl" ? "Film verwijderd uit favorieten." : "Movie removed from favorites.");
       } else {
         // Multi-user mode: remove from matches array in Firestore
@@ -514,12 +544,14 @@ export default function App() {
       }
       const excludeIds = Array.from(swipedIds).concat(seedMovies.map(m => String(m.id)));
       const seedIds = seedMovies.map(m => String(m.id));
+      const seedSimple = seedMovies.map(m => ({ id: String(m.id), title: m.title }));
 
       const res = await fetch("/api/recommendations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           movieIds: seedIds,
+          seedMovies: seedSimple,
           country: room.country || "NL",
           providers: room.providers || ["netflix"],
           maxRuntime: room.maxRuntime,
@@ -586,7 +618,14 @@ export default function App() {
   const isSolo = room ? Object.keys(room.users || {}).length < 2 : false;
   const displayMatches = room && user
     ? (isSolo
-        ? (room.movies || []).filter((m) => room.swipes?.[user.uid]?.[m.id] === true)
+        ? [
+            ...(room.matches || []),
+            ...(room.movies || []).filter((m) => {
+              const mySwipes = room.swipes?.[user.uid] || {};
+              const alreadyInMatches = (room.matches || []).some(match => (typeof match === "string" ? match : match.id) === m.id);
+              return mySwipes[m.id] === true && !alreadyInMatches;
+            })
+          ]
         : (room.matches || []))
     : [];
 

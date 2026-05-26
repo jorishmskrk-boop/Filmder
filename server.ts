@@ -514,8 +514,9 @@ app.post("/api/movies", movieLimiter, async (req, res) => {
 app.post("/api/recommendations", movieLimiter, async (req, res) => {
   try {
     const body = req.body || {};
-    const { movieIds, country, providers, ageRating } = body as {
+    const { movieIds, seedMovies, country, providers, ageRating } = body as {
       movieIds?: string[];
+      seedMovies?: Array<{ id: string; title: string }>;
       country?: string;
       providers?: string[];
       ageRating?: boolean;
@@ -523,6 +524,15 @@ app.post("/api/recommendations", movieLimiter, async (req, res) => {
 
     if (!Array.isArray(movieIds) || movieIds.length === 0) {
       return res.status(400).json({ error: "Geen gematchte of bewaarde films opgegeven om aanbevelingen op te baseren." });
+    }
+
+    const seedMovieTitlesMap: Record<string, string> = {};
+    if (Array.isArray(seedMovies)) {
+      seedMovies.forEach(m => {
+        if (m && m.id) {
+          seedMovieTitlesMap[String(m.id)] = m.title;
+        }
+      });
     }
 
     const minRuntime = typeof body.minRuntime === "number" ? body.minRuntime : undefined;
@@ -580,11 +590,16 @@ app.post("/api/recommendations", movieLimiter, async (req, res) => {
 
     const resultsArrays = await Promise.all(targetMovieIds.map(fetchRecommendationsForMovie));
 
-    // Simple but clever co-occurrence matching
+    // Simple but clever co-occurrence matching with tracking of which seed movie triggered it
     const coCounts: Record<number, number> = {};
     const itemsMap: Record<number, TMDBItem> = {};
+    const recommendSourcesMap: Record<number, Set<string>> = {};
 
-    for (const arr of resultsArrays) {
+    for (let idx = 0; idx < resultsArrays.length; idx++) {
+      const seedId = targetMovieIds[idx];
+      const arr = resultsArrays[idx];
+      if (!arr) continue;
+
       for (const item of arr) {
         if (item && item.id) {
           const idStr = String(item.id);
@@ -592,6 +607,11 @@ app.post("/api/recommendations", movieLimiter, async (req, res) => {
           if (!sourceMovieIdsSet.has(idStr) && !excludeIds.includes(idStr)) {
             coCounts[item.id] = (coCounts[item.id] || 0) + 1;
             itemsMap[item.id] = item;
+
+            if (!recommendSourcesMap[item.id]) {
+              recommendSourcesMap[item.id] = new Set<string>();
+            }
+            recommendSourcesMap[item.id].add(seedId);
           }
         }
       }
@@ -723,16 +743,13 @@ app.post("/api/recommendations", movieLimiter, async (req, res) => {
       const fallbackTrailer = `https://www.youtube.com/results?search_query=${encodeURIComponent(item.title + " " + releaseYear + " trailer NL")}`;
       const trailerUrl = fetchedTrailerUrl || fallbackTrailer;
 
-      let finalRating = Number((item.vote_average || 0).toFixed(1));
-      let ratingSource = "TMDB";
+      const finalRating = Number((item.vote_average || 0).toFixed(1));
+      const ratingSource = "TMDB";
 
-      if (imdbId) {
-        const omdbResult = await getOmdbRating(imdbId);
-        if (omdbResult) {
-          finalRating = omdbResult.rating;
-          ratingSource = omdbResult.source;
-        }
-      }
+      const seedIdsForThisItem = Array.from(recommendSourcesMap[item.id] || []);
+      const recommendedFromTitles = seedIdsForThisItem
+        .map(sid => seedMovieTitlesMap[sid] || "")
+        .filter(title => title.length > 0);
 
       return {
         id: String(item.id),
@@ -746,19 +763,16 @@ app.post("/api/recommendations", movieLimiter, async (req, res) => {
         trailerUrl,
         language: languageName,
         ratingSource,
+        recommendedFrom: recommendedFromTitles,
+        imdbId,
       };
     });
 
     const allFormattedMovies = await Promise.all(promises);
     const formattedMovies = includesPirate ? allFormattedMovies : allFormattedMovies.filter(m => m.providers.length > 0);
 
+    // Filter by year & decade first on all candidate movies
     let filteredMovies = formattedMovies;
-    if (minRating !== undefined && minRating > 0) {
-      filteredMovies = filteredMovies.filter(m => m.rating >= minRating);
-    }
-    if (maxRating !== undefined && maxRating > 0) {
-      filteredMovies = filteredMovies.filter(m => m.rating <= maxRating);
-    }
     if (minYear !== undefined && minYear > 0) {
       filteredMovies = filteredMovies.filter(m => {
         const yr = parseInt(m.year);
@@ -780,12 +794,39 @@ app.post("/api/recommendations", movieLimiter, async (req, res) => {
       }
     }
 
-    if (minRuntime !== undefined && minRuntime > 0) {
-      // In recommendations we keep the full structured lists for safety or filter
+    // Select the final movies (at most 20) before fetching OMDb ratings.
+    // If filtering left us with less than 3 movies, fallback to unfiltered formattedMovies list.
+    const chosenMoviesSource = filteredMovies.length >= 3 ? filteredMovies : formattedMovies;
+    const finalSelectionCandidates = chosenMoviesSource.slice(0, 20);
+
+    // ONLY fetch OMDb ratings for these selected final movies (at most 20)
+    const enrichedMovies = await Promise.all(finalSelectionCandidates.map(async (m) => {
+      if (m.imdbId) {
+        const omdbResult = await getOmdbRating(m.imdbId);
+        if (omdbResult) {
+          return {
+            ...m,
+            rating: omdbResult.rating,
+            ratingSource: omdbResult.source
+          };
+        }
+      }
+      return m;
+    }));
+
+    // Clean up temporary internal field so we don't return it
+    const cleanedMovies = enrichedMovies.map(({ imdbId, ...rest }) => rest);
+
+    // Now apply rating filters if set, as ratings are now properly fetched from OMDb
+    let finalMovies = cleanedMovies;
+    if (minRating !== undefined && minRating > 0) {
+      finalMovies = finalMovies.filter(m => m.rating >= minRating);
+    }
+    if (maxRating !== undefined && maxRating > 0) {
+      finalMovies = finalMovies.filter(m => m.rating <= maxRating);
     }
 
-    const finalMovies = filteredMovies.slice(0, 20);
-    const moviesToReturn = finalMovies.length >= 3 ? finalMovies : formattedMovies.slice(0, 20);
+    const moviesToReturn = finalMovies.length >= 3 ? finalMovies : cleanedMovies;
 
     return res.json({ source: "TMDB_RECOMMENDATIONS", movies: moviesToReturn });
   } catch (error: any) {

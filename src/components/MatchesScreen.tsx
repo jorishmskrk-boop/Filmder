@@ -163,6 +163,15 @@ export default function MatchesScreen({
                     "{movie.synopsis}"
                   </p>
 
+                  {movie.recommendedFrom && movie.recommendedFrom.length > 0 && (
+                    <div className="text-[9.5px] text-slate-400 bg-white/5 border border-white/5 rounded-lg px-2 py-1 flex items-center gap-1 inline-flex max-w-full select-text">
+                      <Sparkles className="w-3 h-3 text-[#ffdb3c] shrink-0 fill-[#ffdb3c]/10 animate-pulse" />
+                      <span className="truncate" title={movie.recommendedFrom.join(", ")}>
+                        {language === "nl" ? "Aanbevolen n.a.v." : "Recommended based on"}: <strong className="text-[#ffdb3c] font-bold">{movie.recommendedFrom.join(", ")}</strong>
+                      </span>
+                    </div>
+                  )}
+
                   {/* Badge providers listing */}
                   <div className="space-y-2 pt-2.5 border-t border-white/5 select-none">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">

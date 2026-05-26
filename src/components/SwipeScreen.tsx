@@ -66,7 +66,13 @@ export default function SwipeScreen({
   // If solo, we list all the user's swiped/liked movies
   const isSolo = otherUsers.length === 0;
   const displayMatches = isSolo
-    ? (room.movies || []).filter(m => mySwipes[m.id] === true)
+    ? [
+        ...(room.matches || []),
+        ...(room.movies || []).filter((m) => {
+          const alreadyInMatches = (room.matches || []).some(match => (typeof match === "string" ? match : match.id) === m.id);
+          return mySwipes[m.id] === true && !alreadyInMatches;
+        })
+      ]
     : (room.matches || []);
 
   // List of all players with their respective swipe progress, sorted stably
@@ -850,10 +856,10 @@ const CinephileCard = memo(function CinephileCard({
         </h2>
 
         {/* 3. Expandable plot synopsis text for mobile comfort / long summaries */}
-        <div className="pointer-events-auto mb-4 select-text">
+        <div className="pointer-events-none mb-4 select-text">
           <p 
             onClick={() => setSynopsisExpanded(!synopsisExpanded)}
-            className={`text-slate-200 text-xs md:text-sm italic cursor-pointer transition-all hover:text-white leading-relaxed ${
+            className={`text-slate-200 text-xs md:text-sm italic cursor-pointer pointer-events-none md:pointer-events-auto transition-all hover:text-white leading-relaxed ${
               synopsisExpanded ? "line-clamp-none max-h-[120px] overflow-y-auto custom-scrollbar pr-1" : "line-clamp-2"
             }`}
           >
@@ -862,13 +868,23 @@ const CinephileCard = memo(function CinephileCard({
           {movie.synopsis && movie.synopsis.length > 100 && (
             <button
               onClick={() => setSynopsisExpanded(!synopsisExpanded)}
-              className="text-[10px] text-[#ffdb3c] font-black mt-1 uppercase hover:underline focus-visible:ring-1 focus-visible:ring-[#ff5637] transition-all focus:outline-none cursor-pointer"
+              className="pointer-events-auto text-[10px] text-[#ffdb3c] font-black mt-1 uppercase hover:underline focus-visible:ring-1 focus-visible:ring-[#ff5637] transition-all focus:outline-none cursor-pointer"
               aria-label={synopsisExpanded ? "Toon kortere synopsis" : "Toon volledige synopsis"}
             >
               {synopsisExpanded ? (language === "nl" ? "Minder tonen ▲" : "Show less ▲") : (language === "nl" ? "Lees meer ▼" : "Read more ▼")}
             </button>
           )}
         </div>
+
+        {/* Recommended From context badge */}
+        {movie.recommendedFrom && movie.recommendedFrom.length > 0 && (
+          <div className="pointer-events-auto shrink-0 mb-3.5 text-[10px] sm:text-[10.5px] text-slate-350 bg-white/5 border border-white/10 rounded-xl px-2.5 py-1.5 flex items-center gap-1.5 backdrop-blur-md select-text">
+            <Sparkles className="w-3.5 h-3.5 text-[#ffdb3c] shrink-0 fill-[#ffdb3c]/10 animate-pulse" />
+            <span className="truncate" title={movie.recommendedFrom.join(", ")}>
+              {language === "nl" ? "Aanbevolen n.a.v." : "Recommended based on"}: <strong className="text-[#ffdb3c] font-bold">{movie.recommendedFrom.join(", ")}</strong>
+            </span>
+          </div>
+        )}
 
         <div className="flex items-center justify-between gap-3 mt-1 sm:mt-1.5 pointer-events-auto">
           <div className="flex items-center gap-1.5 flex-wrap text-xs font-semibold text-slate-350 min-w-0">
