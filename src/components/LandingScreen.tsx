@@ -329,7 +329,7 @@ export default function LandingScreen({ onCreateRoom, onJoinRoom, initialJoinCod
                 <Sparkles className="w-4 h-4 text-[#ffdb3c] fill-[#ffdb3c]" />
               </div>
               <div className="text-left">
-                <p className="text-xs font-black text-[#ffe16d] uppercase tracking-wider">{language === "nl" ? "Uitnodiging Ontvangen" : "Invitation Received"}</p>
+                <p className="text-xs font-black text-[#ffe16d] uppercase tracking-wider">{language === "nl" ? "Uitnodiging ontvangen" : "Invitation received"}</p>
                 <p className="text-[11px] text-slate-200">
                   {language === "nl" ? "Je bent uitgenodigd voor Lobby" : "You have been invited for Lobby"} <span className="text-white font-mono font-black bg-black/40 px-1.5 py-0.5 rounded text-xs border border-white/5">{initialJoinCode}</span>.
                 </p>
@@ -342,7 +342,7 @@ export default function LandingScreen({ onCreateRoom, onJoinRoom, initialJoinCod
               onClick={handleQuickJoinCode}
               className="py-2 px-3.5 rounded-xl bg-[#ffdb3c] hover:bg-[#ffe16d] text-slate-950 text-[10px] font-black uppercase tracking-wider transition-all shadow-md shrink-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {language === "nl" ? "Stap Direct In!" : "Join Instantly!"}
+              {language === "nl" ? "Stap direct in" : "Join instantly"}
             </button>
           </motion.div>
         )}
@@ -413,7 +413,7 @@ export default function LandingScreen({ onCreateRoom, onJoinRoom, initialJoinCod
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 justify-between">
                   <span className="flex items-center gap-1.5 select-none font-bold">
                     <Film className="w-4 h-4 text-[#ff5637]" />
-                    {language === "nl" ? "Kies Filmgenres (Meerdere opties mogelijk)" : "Choose Movie Genres (Multiple allowed)"}
+                    {language === "nl" ? "Kies filmgenres (meerdere opties mogelijk)" : "Choose movie genres (multiple allowed)"}
                   </span>
                   {selectedGenres.length > 0 && (
                     <span className="text-[10px] font-extrabold text-[#ffe16d] bg-[#ffdb3c]/15 px-2.5 py-0.5 rounded-full border border-[#ffdb3c]/20 select-none uppercase tracking-wide">
@@ -430,7 +430,7 @@ export default function LandingScreen({ onCreateRoom, onJoinRoom, initialJoinCod
                     <div className="flex flex-wrap gap-1.5 flex-1 max-w-[calc(100%-24px)]">
                       {selectedGenres.length === 0 ? (
                         <span className="text-slate-500 text-xs py-0.5 select-none font-semibold">
-                          {language === "nl" ? "Alle Genres (Geen filter)" : "All Genres (No filter)"}
+                          {language === "nl" ? "Alle genres (geen filter)" : "All genres (no filter)"}
                         </span>
                       ) : (
                         selectedGenres.map(id => {
@@ -476,7 +476,7 @@ export default function LandingScreen({ onCreateRoom, onJoinRoom, initialJoinCod
                             }}
                             className="text-[10px] text-[#ffb4a5] font-extrabold hover:text-white transition-colors cursor-pointer px-2 py-1 hover:bg-[#ff5637]/10 rounded"
                           >
-                            {selectedGenres.length === GENRES.length ? "Deselecteer Alles" : "Selecteer Alles"}
+                            {selectedGenres.length === GENRES.length ? "Deselecteer alles" : "Selecteer alles"}
                           </button>
                         </div>
 
@@ -542,7 +542,7 @@ export default function LandingScreen({ onCreateRoom, onJoinRoom, initialJoinCod
                 <div className="space-y-2 col-span-1 sm:col-span-2 bg-black/25 p-3.5 rounded-xl border border-white/5">
                   <div className="flex justify-between items-center">
                     <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block select-none">
-                      {language === "nl" ? "Jaartallen Range" : "Release Year Range"}
+                      {language === "nl" ? "Jaartallen range" : "Release year range"}
                     </span>
                     <span className="text-xs text-[#ff5637] font-extrabold font-mono select-none">
                       {minYear} - {maxYear}
@@ -588,7 +588,7 @@ export default function LandingScreen({ onCreateRoom, onJoinRoom, initialJoinCod
                 <div className="space-y-2 col-span-1 sm:col-span-2 bg-black/25 p-3.5 rounded-xl border border-white/5">
                   <div className="flex justify-between items-center">
                     <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block select-none">
-                      {language === "nl" ? "Speelduur Range" : "Runtime Range"}
+                      {language === "nl" ? "Speelduur range" : "Runtime range"}
                     </span>
                     <span className="text-xs text-[#ff5637] font-extrabold font-mono select-none">
                       {minRuntime} min - {maxRuntime >= 240 ? t("no_limit") : `${maxRuntime} min`}
@@ -704,7 +704,7 @@ export default function LandingScreen({ onCreateRoom, onJoinRoom, initialJoinCod
         {!name.trim() && (
           <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-center animate-pulse">
             <p className="text-xs font-bold text-amber-400">
-              {language === "nl" ? "⚠️ Vul eerst hierboven jouw naam/nickname in om door te gaan!" : "⚠️ Enter your name/nickname above first to continue!"}
+              {language === "nl" ? "Vul eerst hierboven jouw naam/nickname in om door te gaan." : "Enter your name/nickname above first to continue."}
             </p>
           </div>
         )}
@@ -754,7 +754,7 @@ export default function LandingScreen({ onCreateRoom, onJoinRoom, initialJoinCod
               className="flex items-center justify-center gap-2 py-4 px-6 rounded-full bg-black/20 border border-white/5 hover:bg-white/5 hover:border-[#ff5637]/30 text-white font-extrabold transition-all cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed disabled:pointer-events-none"
             >
               <Key className="w-4 h-4 text-[#ffdb3c] shrink-0" />
-              {language === "nl" ? "Code Invoeren" : "Enter Code"}
+              {language === "nl" ? "Code invoeren" : "Enter code"}
             </button>
           </div>
         )}

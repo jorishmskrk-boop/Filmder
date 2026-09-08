@@ -44,7 +44,7 @@ export default function TrailerModal({ url, onClose }: TrailerModalProps) {
         {/* Header toolbar */}
         <div className="h-14 px-6 flex items-center justify-between border-b border-white/5 bg-[#171725]">
           <span className="text-xs font-bold text-slate-400 uppercase tracking-widest font-mono">
-            {language === "nl" ? "Officiële Trailer" : "Official Trailer"}
+            {language === "nl" ? "Officiële trailer" : "Official trailer"}
           </span>
           <button
             onClick={onClose}
@@ -70,8 +70,8 @@ export default function TrailerModal({ url, onClose }: TrailerModalProps) {
             <div className="absolute inset-0 p-8 flex flex-col justify-center items-center text-center space-y-4">
               <p className="text-xs text-slate-400 max-w-md leading-relaxed">
                 {language === "nl"
-                  ? "We konden deze trailer niet rechtstreeks in de app embedden. Open de trailer via de knop hieronder!"
-                  : "We could not embed this trailer directly. Open the external link to watch the trailer!"}
+                  ? "We konden deze trailer niet rechtstreeks in de app embedden. Open de trailer via de knop hieronder."
+                  : "We could not embed this trailer directly. Open the external link to watch the trailer."}
               </p>
               <a
                 href={url}

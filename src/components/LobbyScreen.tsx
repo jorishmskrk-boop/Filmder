@@ -109,7 +109,7 @@ export default function LobbyScreen({ room, currentUserId, onStartSwiping, onLea
 
             {usersList.length < 2 && (
               <div className="p-3.5 rounded-xl border border-dashed border-white/10 bg-black/10 text-slate-400 text-xs italic py-4">
-                {language === "nl" ? "Deel de onderstaande link om vrienden uit te nodigen voor je lobby! 🍿" : "Share the link below to invite friends to join your lobby! 🍿"}
+                {language === "nl" ? "Deel de onderstaande link om vrienden uit te nodigen voor je lobby." : "Share the link below to invite friends to join your lobby."}
               </div>
             )}
           </div>
@@ -118,7 +118,7 @@ export default function LobbyScreen({ room, currentUserId, onStartSwiping, onLea
         {/* Dynamic Invite Link Card */}
         <div className="space-y-2 text-left">
           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block pl-1">
-            {language === "nl" ? "Vrienden Direct Uitnodigen (Kopieer link)" : "Directly Invite Friends (Copy link)"}
+            {language === "nl" ? "Vrienden direct uitnodigen (kopieer link)" : "Directly invite friends (copy link)"}
           </label>
           <div className="flex bg-black/20 border border-white/5 hover:border-white/10 rounded-xl overflow-hidden transition-all">
             <input
@@ -147,7 +147,7 @@ export default function LobbyScreen({ room, currentUserId, onStartSwiping, onLea
         <div className="pt-2">
           {!hasPartner && (
             <p className="text-xs text-slate-400 mb-4 leading-relaxed">
-              {language === "nl" ? "We raden aan om op je partner te wachten, maar je kunt ook alvast in je eentje beginnen met swipen!" : "We recommend waiting for your partner, but you can also start swiping by yourself!"}
+              {language === "nl" ? "We raden aan om op je partner te wachten, maar je kunt ook alvast in je eentje beginnen met swipen." : "We recommend waiting for your partner, but you can also start swiping by yourself."}
             </p>
           )}
           <button
@@ -161,7 +161,7 @@ export default function LobbyScreen({ room, currentUserId, onStartSwiping, onLea
             {hasPartner && (
               <span className="flex items-center gap-0.5 ml-1.5 text-[9px] px-2 py-0.5 rounded-full bg-black/30 text-[#ffdb3c] font-black uppercase tracking-widest border border-[#ffdb3c]/30 animate-pulse">
                 <Sparkles className="w-3 h-3 text-[#ffdb3c] fill-[#ffdb3c]" />
-                {language === "nl" ? "Samen Actief" : "Together Active"}
+                {language === "nl" ? "Samen actief" : "Together active"}
               </span>
             )}
           </button>

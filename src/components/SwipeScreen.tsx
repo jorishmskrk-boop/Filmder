@@ -21,7 +21,7 @@ const REACTION_MAP: Record<string, { label: string; labelEn: string; color: stri
   "❤️": { label: "Favoriet", labelEn: "Favorite", color: "from-rose-500/20 to-pink-500/20 text-rose-400 border-rose-500/30" },
   "🔥": { label: "Must Watch", labelEn: "Must Watch", color: "from-orange-500/20 to-amber-500/20 text-amber-400 border-amber-500/30" },
   "😂": { label: "Hilarisch", labelEn: "Hilarious", color: "from-yellow-500/20 to-lime-500/20 text-yellow-400 border-yellow-500/30" },
-  "🍿": { label: "Zin In", labelEn: "Excited", color: "from-emerald-500/20 to-teal-500/20 text-emerald-400 border-emerald-500/30" },
+  "🍿": { label: "Zin in", labelEn: "Excited", color: "from-emerald-500/20 to-teal-500/20 text-emerald-400 border-emerald-500/30" },
   "😱": { label: "Spannend", labelEn: "Thrilling", color: "from-violet-500/20 to-fuchsia-500/20 text-violet-400 border-violet-500/30" },
 };
 
@@ -305,26 +305,26 @@ export default function SwipeScreen({
                   <div className="space-y-1">
                     <h4 className="font-bold text-[#e3e0f1] font-display">
                       {!partnerId ? (
-                        language === "nl" ? "Einde van de filmstapel!" : "End of the movie stack!"
+                        language === "nl" ? "Einde van de filmstapel" : "End of the movie stack"
                       ) : !partnerFinished ? (
                         language === "nl" ? "Wachten op je partner..." : "Waiting for your partner..."
                       ) : (
-                        language === "nl" ? "Klaar met deze stapel!" : "Finished with this stack!"
+                        language === "nl" ? "Klaar met deze stapel" : "Finished with this stack"
                       )}
                     </h4>
                     <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
                       {!partnerId ? (
-                        language === "nl" 
-                          ? "Er zijn geen films meer beschikbaar binnen je geselecteerde criteria. Pas de lobby-instellingen aan of herlaad de stapel!"
-                          : "There are no more movies available with your active filters. Adjust room settings or reload the stack!"
+                        language === "nl"
+                          ? "Er zijn geen films meer beschikbaar binnen je geselecteerde criteria. Pas de lobby-instellingen aan of herlaad de stapel."
+                          : "There are no more movies available with your active filters. Adjust room settings or reload the stack."
                       ) : !partnerFinished ? (
                         language === "nl"
-                          ? `Je hebt alle films in deze stapel geswiped! We wachten nu tot ${partnerName} ook klaar is.`
-                          : `You've swiped all movies in this stack! Now waiting for ${partnerName} to finish too.`
+                          ? `Je hebt alle films in deze stapel geswiped. We wachten nu tot ${partnerName} ook klaar is.`
+                          : `You've swiped all movies in this stack. Now waiting for ${partnerName} to finish too.`
                       ) : (
                         language === "nl"
-                          ? "Jullie hebben allebei deze stapel doorgebladerd! Klik op 'Gloednieuwe stapel ophalen' voor de volgende ronde."
-                          : "You have both finished checking this stack! Click 'Get a brand new stack' for the next round."
+                          ? "Jullie hebben allebei deze stapel doorgebladerd. Klik op 'Gloednieuwe stapel ophalen' voor de volgende ronde."
+                          : "You have both finished checking this stack. Click 'Get a brand new stack' for the next round."
                       )}
                     </p>
                   </div>
@@ -333,7 +333,7 @@ export default function SwipeScreen({
                     <div className="p-4 rounded-2xl bg-black/45 border border-white/5 max-w-sm w-full space-y-3.5 mt-2 shadow-inner text-left">
                       <div className="border-b border-white/5 pb-1.5 flex justify-between items-center">
                         <span className="text-[10px] text-slate-400 uppercase tracking-widest block font-extrabold font-mono">
-                          {language === "nl" ? "Wacht-Voortgang" : "Waiting Progress"}
+                          {language === "nl" ? "Wachtvoortgang" : "Waiting progress"}
                         </span>
                         <span className="text-[9px] text-[#ffdb3c] font-black uppercase inline-block animate-pulse">
                           {language === "nl" ? "Wachten..." : "Waiting..."}
@@ -360,7 +360,7 @@ export default function SwipeScreen({
                         ))}
                       </div>
                       <p className="text-[10px] text-slate-400 font-medium italic text-center pt-1">
-                        {language === "nl" ? "Tip: Plaag of help je partner door reacties te sturen!" : "Tip: Playfully nudge or cheer your partner by sending reactions!"}
+                        {language === "nl" ? "Tip: plaag of help je partner door reacties te sturen." : "Tip: playfully nudge or cheer your partner by sending reactions."}
                       </p>
                     </div>
                   )}
@@ -457,7 +457,7 @@ export default function SwipeScreen({
             <div className="flex items-center justify-between border-b border-white/5 pb-2">
               <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest flex items-center gap-1.5 font-display">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse animate-duration-1000" />
-                {language === "nl" ? "Groepsstatus" : "Group Status"}
+                {language === "nl" ? "Groepsstatus" : "Group status"}
               </h3>
               <span className="text-[10px] bg-slate-900 text-[#ffb4a5] px-2.5 py-0.5 rounded-full font-mono font-bold border border-[#ff5637]/15">
                 {currentMovies.length} {language === "nl" ? "films" : "movies"}
@@ -502,13 +502,13 @@ export default function SwipeScreen({
                         <p className="text-[10px] text-slate-400 font-sans tracking-wide">
                           {player.isFinished ? (
                             <span className="text-emerald-400 font-bold flex items-center gap-1">
-                              ✓ {language === "nl" ? "Klaar! 🏁" : "Finished! 🏁"}
+                              ✓ {language === "nl" ? "Klaar" : "Finished"}
                             </span>
                           ) : (
                             <span>
-                              {language === "nl" 
-                                ? `Nog ${player.totalCount - player.swipedMoviesCount} keuzes 🍿` 
-                                : `Remaining ${player.totalCount - player.swipedMoviesCount} is 🍿`}
+                              {language === "nl"
+                                ? `Nog ${player.totalCount - player.swipedMoviesCount} keuzes`
+                                : `Remaining ${player.totalCount - player.swipedMoviesCount} is`}
                             </span>
                           )}
                         </p>
@@ -546,9 +546,9 @@ export default function SwipeScreen({
             {isSolo && (
               <div className="p-3 rounded-2xl bg-black/35 border border-dashed border-white/10 text-center space-y-1.5 mt-2">
                 <p className="text-[10px] text-slate-400 leading-relaxed">
-                  {language === "nl" 
-                    ? "Alleen aan het swipen? Deel je kamercode hierboven om samen keuzes te maken!" 
-                    : "Swiping solo? Share your room code above to start swipe-matching together!"}
+                  {language === "nl"
+                    ? "Alleen aan het swipen? Deel je kamercode hierboven om samen keuzes te maken."
+                    : "Swiping solo? Share your room code above to start swipe-matching together."}
                 </p>
               </div>
             )}
@@ -559,7 +559,7 @@ export default function SwipeScreen({
           {/* Reactions Tray without raw emojis */}
           <div className="space-y-3 glass-card rounded-3xl p-4 border border-white/5">
             <h3 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest text-center">
-              {language === "nl" ? "Reactie Sturen" : "Send Reaction"}
+              {language === "nl" ? "Reactie sturen" : "Send reaction"}
             </h3>
             <div className="flex flex-wrap gap-1.5 justify-center">
               {Object.entries(REACTION_MAP).map(([emoji, item]) => (
@@ -599,7 +599,7 @@ export default function SwipeScreen({
             >
               <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#ff5637]/15 border border-[#ff5637]/30 text-[#ffb4a5] text-xs font-bold uppercase tracking-widest mb-2 animate-bounce font-mono">
                 <Sparkles className="w-3.5 h-3.5 text-[#ffdb3c]" />
-                {language === "nl" ? "Jullien hebben een Match!" : "You have a Match!"}
+                {language === "nl" ? "Jullie hebben een match" : "You have a match"}
               </div>
 
               <div className="w-full h-36 rounded-2xl overflow-hidden relative border border-white/5 shadow-inner select-none">
@@ -661,7 +661,7 @@ export default function SwipeScreen({
                     aria-label={`Bekijk trailer van ${celebrationMatch.title}`}
                   >
                     <Play className="w-3.5 h-3.5 fill-white text-white shrink-0" />
-                    {language === "nl" ? "Bekijk Trailer" : "Watch Trailer"}
+                    {language === "nl" ? "Bekijk trailer" : "Watch trailer"}
                   </a>
                 )}
                  <button
@@ -676,7 +676,7 @@ export default function SwipeScreen({
                   className="w-full py-3 px-4 rounded-full glow-button text-white font-extrabold tracking-wide shadow-md active:scale-95 transition-all cursor-pointer text-xs uppercase tracking-widest focus-visible:ring-2 focus-visible:ring-[#ff5637] focus:outline-none"
                   aria-label="Sluit viering en ga door naar matches"
                 >
-                  {language === "nl" ? "Bekijk onze matches! 🍿" : "View our matches! 🍿"}
+                  {language === "nl" ? "Bekijk onze matches" : "View our matches"}
                 </button>
               </div>
             </motion.div>
@@ -785,13 +785,13 @@ const CinephileCard = memo(function CinephileCard({
             }`} />
             <span>
               {isLastVote ? (
-                language === "nl" ? "Laatste Beslissing! 🔥" : "Last Decision! 🔥"
+                language === "nl" ? "Laatste beslissing" : "Last decision"
               ) : swipedOthers.length > 0 ? (
-                language === "nl" 
-                  ? `${swipedOthers.map(([_, name]) => name).join(", ")} heeft al gestemd ✓` 
+                language === "nl"
+                  ? `${swipedOthers.map(([_, name]) => name).join(", ")} heeft al gestemd ✓`
                   : `${swipedOthers.map(([_, name]) => name).join(", ")} swiped ✓`
               ) : (
-                language === "nl" ? "Wachten op stemmen... ⏳" : "Waiting for votes... ⏳"
+                language === "nl" ? "Wachten op stemmen..." : "Waiting for votes..."
               )}
             </span>
           </div>

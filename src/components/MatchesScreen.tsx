@@ -35,26 +35,26 @@ export default function MatchesScreen({
           <h2 className="text-xl font-bold font-display tracking-tight text-[#e3e0f1] flex items-center gap-2">
             <Award className="w-5 h-5 text-[#ff5637]" />
             {isSolo 
-              ? (language === "nl" ? "Mijn Favoriete Films" : "My Favorite Movies")
-              : (language === "nl" ? "Gezamenlijke Matches" : "Mutual Matches")}
+              ? (language === "nl" ? "Mijn favoriete films" : "My favorite movies")
+              : (language === "nl" ? "Gezamenlijke matches" : "Mutual matches")}
           </h2>
           <p className="text-xs text-slate-300">
             {isSolo ? (
-              matches.length === 1 
-                ? (language === "nl" 
-                    ? "Je hebt 1 film bewaard! Pak de popcorn maar alvast!" 
-                    : "You have 1 saved movie! Get the popcorn ready!") 
+              matches.length === 1
+                ? (language === "nl"
+                    ? "Je hebt 1 film bewaard. Pak de popcorn maar alvast."
+                    : "You have 1 saved movie. Get the popcorn ready.")
                 : (language === "nl"
-                    ? `Je hebt ${matches.length} films op je favorietenlijst!`
-                    : `You have ${matches.length} movies on your favorites list!`)
+                    ? `Je hebt ${matches.length} films op je favorietenlijst.`
+                    : `You have ${matches.length} movies on your favorites list.`)
             ) : (
-              matches.length === 1 
-                ? (language === "nl" 
-                    ? "Je hebt 1 gezamenlijke film-match! Pak de popcorn maar alvast!" 
-                    : "You have 1 mutual movie match! Get the popcorn ready!") 
+              matches.length === 1
+                ? (language === "nl"
+                    ? "Je hebt 1 gezamenlijke film-match. Pak de popcorn maar alvast."
+                    : "You have 1 mutual movie match. Get the popcorn ready.")
                 : (language === "nl"
-                    ? `Jullie hebben ${matches.length} gezamenlijke matches op jullie lijst!`
-                    : `You have ${matches.length} mutual matches on your list!`)
+                    ? `Jullie hebben ${matches.length} gezamenlijke matches op jullie lijst.`
+                    : `You have ${matches.length} mutual matches on your list.`)
             )}
           </p>
         </div>
@@ -68,7 +68,7 @@ export default function MatchesScreen({
               title={language === "nl" ? "Maak een nieuwe filmstapel gebaseerd op je matches" : "Create a new movie stack based on your matches"}
             >
               <Sparkles className="w-3.5 h-3.5 text-[#ffdb3c] animate-pulse" />
-              <span>{language === "nl" ? "Vind Vergelijkbare Films" : "Find Similar Movies"}</span>
+              <span>{language === "nl" ? "Vind vergelijkbare films" : "Find similar movies"}</span>
             </button>
           )}
 
@@ -77,7 +77,7 @@ export default function MatchesScreen({
             onClick={onBackToSwipes}
             className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-black/20 border border-white/5 hover:bg-white/5 hover:border-[#ff5637]/30 text-white text-xs font-bold transition-all cursor-pointer select-none text-center"
           >
-            {language === "nl" ? "Verder Swipen" : "Keep Swiping"}
+            {language === "nl" ? "Verder swipen" : "Keep swiping"}
           </button>
         </div>
       </div>
@@ -109,7 +109,7 @@ export default function MatchesScreen({
                   {/* Floating extra heart (superLikesCount) stamp on top-left of image */}
                   {superLikesCount > 0 && (
                     <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-pink-500 backdrop-blur-md border border-pink-400/25 text-[10px] font-black text-white shadow-md animate-bounce select-none">
-                      <span>💖</span>
+                      <Heart className="w-3 h-3 fill-white text-white" />
                       <span>{superLikesCount}</span>
                     </div>
                   )}
@@ -197,7 +197,7 @@ export default function MatchesScreen({
                           ? "bg-gradient-to-r from-pink-500 to-rose-500 border-pink-400 text-white shadow-md shadow-pink-500/25 hover:brightness-110 active:scale-95"
                           : "bg-pink-500/10 border-pink-500/20 text-pink-400 hover:bg-pink-500/20 active:scale-95"
                       }`}
-                      title={language === "nl" ? "Geef een extra hartje!" : "Give an extra heart!"}
+                      title={language === "nl" ? "Geef een extra hartje" : "Give an extra heart"}
                     >
                       <Heart className={`w-3.5 h-3.5 ${hasMySuperLike ? "fill-white text-white" : "fill-none text-pink-400"}`} />
                       <span>{superLikesCount > 0 ? `${superLikesCount}` : "+1"}</span>
@@ -209,7 +209,7 @@ export default function MatchesScreen({
                       onClick={() => onRemoveMatch(movie.id)}
                       className="py-2 px-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 text-[11px] font-bold border border-red-500/15 rounded-xl transition-all cursor-pointer select-none uppercase tracking-wider shrink-0"
                       title={isSolo
-                        ? (language === "nl" ? "Verwijder uit Favorieten" : "Remove from Favorites")
+                        ? (language === "nl" ? "Verwijder uit favorieten" : "Remove from favorites")
                         : (language === "nl" ? "Verwijder voor iedereen" : "Remove for everyone")}
                     >
                       {language === "nl" ? "Verwijder" : "Remove"}
@@ -235,12 +235,12 @@ export default function MatchesScreen({
             <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed px-4">
               {isSolo ? (
                 language === "nl"
-                  ? "Wanneer je een film naar 'Leuk' (Rechts Swipen) swipet, verschijnt deze hier direct zodat je ze later makkelijk kunt bekijken!"
-                  : "When you swipe a movie to 'Like' (Swipe right), it will instantly appear here so you can easily review it later!"
+                  ? "Wanneer je een film naar 'Leuk' (rechts swipen) swipet, verschijnt deze hier zodat je hem later makkelijk kunt terugvinden."
+                  : "When you swipe a movie to 'Like' (swipe right), it will appear here so you can easily find it again later."
               ) : (
-                language === "nl" 
-                  ? "Wanneer jullie allebei 'Leuk' (Rechts Swipen in de app) op exact dezelfde film selecteren, verschijnt die film hier direct live in real-time!" 
-                  : "When both of you swipe 'Like' (Swipe right in the app) on the exact same movie, it will instantly appear here live in real-time!"
+                language === "nl"
+                  ? "Wanneer jullie allebei 'Leuk' (rechts swipen) selecteren voor dezelfde film, verschijnt die direct hier."
+                  : "When both of you swipe 'Like' (swipe right) on the same movie, it will appear here right away."
               )}
             </p>
           </div>
@@ -249,7 +249,7 @@ export default function MatchesScreen({
             onClick={onBackToSwipes}
             className="px-6 py-3 bg-gradient-to-r from-[#ff5637] to-[#ba1c00] text-white font-extrabold rounded-full cursor-pointer hover:brightness-110 active:scale-95 transition-all outline-none"
           >
-            {language === "nl" ? "Nu beginnen met Swipen" : "Start Swiping Now"}
+            {language === "nl" ? "Nu beginnen met swipen" : "Start swiping now"}
           </button>
         </div>
       )}

@@ -153,7 +153,7 @@ export default function App() {
 
           if (movieCollection.length > 0) {
             await loadNewBatchInFirestore(roomCode, userIds, movieCollection, true, moviesData.fallbackLevel);
-            toast.success("Niemand vond de vorige films leuk... Er is automatisch een nieuwe stapel films geladen!");
+            toast.success("Niemand vond de vorige films leuk. Er is automatisch een nieuwe stapel films geladen.");
           }
         } catch (err) {
           console.error("Fout bij het automatisch ophalen van een nieuwe batch:", err);
@@ -346,7 +346,7 @@ export default function App() {
               } else {
                 await addMatchInFirestore(roomCode, movieId);
               }
-              toast.success("Match gevonden! 🎉", { icon: "🔥" });
+              toast.success("Match gevonden.");
             }
           }
         } else {
@@ -389,9 +389,9 @@ export default function App() {
     try {
       await toggleSuperLikeInFirestore(roomCode, user.uid, movieId, !alreadySuperLiked);
       if (alreadySuperLiked) {
-        toast.success(language === "nl" ? "Extra hartje verwijderd!" : "Extra heart removed!");
+        toast.success(language === "nl" ? "Extra hartje verwijderd." : "Extra heart removed.");
       } else {
-        toast.success(language === "nl" ? "Extra hartje toegevoegd! 💖" : "Extra heart added! 💖");
+        toast.success(language === "nl" ? "Extra hartje toegevoegd." : "Extra heart added.");
       }
     } catch (err: any) {
       console.error("Error registering extra heart:", err);
@@ -444,7 +444,7 @@ export default function App() {
     try {
       const userIds = Object.keys(room.users || {});
       await resetRoomDeckInFirestore(roomCode, userIds);
-      toast.success(language === "nl" ? "Alle swipes hersteld!" : "All swipes reset!");
+      toast.success(language === "nl" ? "Alle swipes hersteld." : "All swipes reset.");
     } catch (err) {
       console.error("Error resetting cinephile deck:", err);
     }
@@ -494,7 +494,7 @@ export default function App() {
       if (movieCollection.length > 0) {
         const userIds = Object.keys(room.users || {});
         await loadNewBatchInFirestore(roomCode, userIds, movieCollection, false, moviesData.fallbackLevel);
-        toast.success(language === "nl" ? "Er is een gloednieuwe stapel films geladen!" : "A brand new deck of movies has been loaded!");
+        toast.success(language === "nl" ? "Er is een gloednieuwe stapel films geladen." : "A brand new deck of movies has been loaded.");
       } else {
         throw new Error(language === "nl" ? "Geen geschikte films gevonden voor de nieuwe instellingen." : "No suitable movies found for the new settings.");
       }
@@ -522,8 +522,8 @@ export default function App() {
     if (seedMovies.length === 0) {
       toast.error(
         language === "nl"
-          ? "Je hebt ten minste één film-match of bewaarde film nodig om vergelijkbare films te kunnen zoeken!"
-          : "You need at least one movie match or saved movie to find similar films!"
+          ? "Je hebt ten minste één film-match of bewaarde film nodig om vergelijkbare films te kunnen zoeken."
+          : "You need at least one movie match or saved movie to find similar films."
       );
       return;
     }
@@ -582,8 +582,8 @@ export default function App() {
         setActiveTab("swipe");
         toast.success(
           language === "nl"
-            ? `Succes! Een nieuwe stapel van ${recommendedMovies.length} vergelijkbare films is geladen!`
-            : `Success! A new stack of ${recommendedMovies.length} similar movies has been loaded!`
+            ? `Een nieuwe stapel van ${recommendedMovies.length} vergelijkbare films is geladen.`
+            : `A new stack of ${recommendedMovies.length} similar movies has been loaded.`
         );
       } else {
         throw new Error(
