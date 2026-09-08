@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { onSnapshot } from "firebase/firestore";
-import { OperationType, handleFirestoreError, getRoomRef } from "../firebase";
+import { OperationType, handleFirestoreError, getRoomRef, isRoomExpired } from "../firebase";
 import { Room, Movie } from "../types";
 import { User } from "firebase/auth";
 
@@ -25,6 +25,14 @@ export function useRoomSession(user: User | null, setErrorMsg: (msg: string | nu
       (snapshot) => {
         if (snapshot.exists()) {
           const data = snapshot.data();
+
+          if (isRoomExpired(data.expiresAt)) {
+            setRoomCode(null);
+            setRoom(null);
+            setErrorMsg("Deze lobby is verlopen (lobbies zijn 24 uur geldig).");
+            return;
+          }
+
           const moviesList = (data.movies || []) as Movie[];
           const rawMatches = (data.matches || []) as (Movie | string)[];
 

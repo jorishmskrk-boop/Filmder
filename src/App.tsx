@@ -14,7 +14,8 @@ import {
   toggleSuperLikeInFirestore,
   sendGlobalReactionInFirestore,
   resetRoomDeckInFirestore,
-  loadNewBatchInFirestore
+  loadNewBatchInFirestore,
+  isRoomExpired
 } from "./firebase";
 import { Movie, Room, Preferences } from "./types";
 import { useRoomSession } from "./hooks/useRoomSession";
@@ -290,7 +291,7 @@ export default function App() {
         handleFirestoreError(err, OperationType.GET, docPath);
       }
 
-      if (!roomSnap || !roomSnap.exists()) {
+      if (!roomSnap || !roomSnap.exists() || isRoomExpired(roomSnap.data()?.expiresAt)) {
         throw new Error(t("lobby_not_found").replace("{code}", code));
       }
 

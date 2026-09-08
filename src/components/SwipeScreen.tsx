@@ -19,10 +19,10 @@ interface SwipeScreenProps {
 
 const REACTION_MAP: Record<string, { label: string; labelEn: string; color: string }> = {
   "❤️": { label: "Favoriet", labelEn: "Favorite", color: "from-rose-500/20 to-pink-500/20 text-rose-400 border-rose-500/30" },
-  "🔥": { label: "Must Watch", labelEn: "Must Watch", color: "from-orange-500/20 to-amber-550/20 text-amber-400 border-amber-500/30" },
+  "🔥": { label: "Must Watch", labelEn: "Must Watch", color: "from-orange-500/20 to-amber-500/20 text-amber-400 border-amber-500/30" },
   "😂": { label: "Hilarisch", labelEn: "Hilarious", color: "from-yellow-500/20 to-lime-500/20 text-yellow-400 border-yellow-500/30" },
-  "🍿": { label: "Zin In", labelEn: "Excited", color: "from-emerald-500/20 to-teal-550/20 text-emerald-400 border-emerald-500/30" },
-  "😱": { label: "Spannend", labelEn: "Thrilling", color: "from-violet-500/20 to-fuchsia-500/20 text-violet-400 border-violet-550/30" },
+  "🍿": { label: "Zin In", labelEn: "Excited", color: "from-emerald-500/20 to-teal-500/20 text-emerald-400 border-emerald-500/30" },
+  "😱": { label: "Spannend", labelEn: "Thrilling", color: "from-violet-500/20 to-fuchsia-500/20 text-violet-400 border-violet-500/30" },
 };
 
 export default function SwipeScreen({
@@ -332,7 +332,7 @@ export default function SwipeScreen({
                   {partnerId && !partnerFinished && (
                     <div className="p-4 rounded-2xl bg-black/45 border border-white/5 max-w-sm w-full space-y-3.5 mt-2 shadow-inner text-left">
                       <div className="border-b border-white/5 pb-1.5 flex justify-between items-center">
-                        <span className="text-[10px] text-slate-450 uppercase tracking-widest block font-extrabold font-mono">
+                        <span className="text-[10px] text-slate-400 uppercase tracking-widest block font-extrabold font-mono">
                           {language === "nl" ? "Wacht-Voortgang" : "Waiting Progress"}
                         </span>
                         <span className="text-[9px] text-[#ffdb3c] font-black uppercase inline-block animate-pulse">
@@ -455,7 +455,7 @@ export default function SwipeScreen({
           {/* Group Progress Dashboard */}
           <div className="glass-card rounded-3xl p-5 border border-white/5 space-y-4">
             <div className="flex items-center justify-between border-b border-white/5 pb-2">
-              <h3 className="text-xs font-bold text-slate-350 uppercase tracking-widest flex items-center gap-1.5 font-display">
+              <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest flex items-center gap-1.5 font-display">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse animate-duration-1000" />
                 {language === "nl" ? "Groepsstatus" : "Group Status"}
               </h3>
@@ -499,7 +499,7 @@ export default function SwipeScreen({
                             </span>
                           )}
                         </p>
-                        <p className="text-[10px] text-slate-450 font-sans tracking-wide">
+                        <p className="text-[10px] text-slate-400 font-sans tracking-wide">
                           {player.isFinished ? (
                             <span className="text-emerald-400 font-bold flex items-center gap-1">
                               ✓ {language === "nl" ? "Klaar! 🏁" : "Finished! 🏁"}
@@ -657,7 +657,7 @@ export default function SwipeScreen({
                     href={celebrationMatch.trailerUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="w-full py-3 px-4 rounded-full bg-red-655 hover:bg-gradient-to-br hover:from-red-600 hover:to-red-700 text-white font-extrabold flex items-center justify-center gap-2 hover:text-white transition-all cursor-pointer shadow-md active:scale-95 text-xs uppercase tracking-widest focus-visible:ring-2 focus-visible:ring-red-500 focus:outline-none"
+                    className="w-full py-3 px-4 rounded-full bg-red-600 hover:bg-gradient-to-br hover:from-red-600 hover:to-red-700 text-white font-extrabold flex items-center justify-center gap-2 hover:text-white transition-all cursor-pointer shadow-md active:scale-95 text-xs uppercase tracking-widest focus-visible:ring-2 focus-visible:ring-red-500 focus:outline-none"
                     aria-label={`Bekijk trailer van ${celebrationMatch.title}`}
                   >
                     <Play className="w-3.5 h-3.5 fill-white text-white shrink-0" />
@@ -781,7 +781,7 @@ const CinephileCard = memo(function CinephileCard({
                 : "bg-black/65 border-white/10 text-slate-400"
           }`}>
             <span className={`w-2 h-2 rounded-full ${
-              isLastVote ? "bg-amber-400 animate-ping" : swipedOthers.length > 0 ? "bg-emerald-450 animate-pulse" : "bg-slate-550"
+              isLastVote ? "bg-amber-400 animate-ping" : swipedOthers.length > 0 ? "bg-emerald-400 animate-pulse" : "bg-slate-500"
             }`} />
             <span>
               {isLastVote ? (
@@ -831,7 +831,7 @@ const CinephileCard = memo(function CinephileCard({
                 href={movie.trailerUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="pointer-events-auto flex items-center gap-1 bg-gradient-to-r from-red-655 to-red-600 hover:from-red-500 hover:to-red-600 border border-red-500/25 px-2 py-1 text-[8.5px] font-extrabold text-white uppercase tracking-widest rounded-full shrink-0 cursor-pointer shadow-md transition-all active:scale-95 hover:scale-105 focus-visible:ring-2 focus-visible:ring-red-550 focus:outline-none"
+                className="pointer-events-auto flex items-center gap-1 bg-gradient-to-r from-red-700 to-red-600 hover:from-red-500 hover:to-red-600 border border-red-500/25 px-2 py-1 text-[8.5px] font-extrabold text-white uppercase tracking-widest rounded-full shrink-0 cursor-pointer shadow-md transition-all active:scale-95 hover:scale-105 focus-visible:ring-2 focus-visible:ring-red-500 focus:outline-none"
                 title={language === "nl" ? "Bekijk de trailer op YouTube" : "Watch trailer on YouTube"}
                 aria-label={`Bekijk trailer van ${movie.title}`}
               >
@@ -878,7 +878,7 @@ const CinephileCard = memo(function CinephileCard({
 
         {/* Recommended From context badge */}
         {movie.recommendedFrom && movie.recommendedFrom.length > 0 && (
-          <div className="pointer-events-auto shrink-0 mb-3.5 text-[10px] sm:text-[10.5px] text-slate-350 bg-white/5 border border-white/10 rounded-xl px-2.5 py-1.5 flex items-center gap-1.5 backdrop-blur-md select-text">
+          <div className="pointer-events-auto shrink-0 mb-3.5 text-[10px] sm:text-[10.5px] text-slate-300 bg-white/5 border border-white/10 rounded-xl px-2.5 py-1.5 flex items-center gap-1.5 backdrop-blur-md select-text">
             <Sparkles className="w-3.5 h-3.5 text-[#ffdb3c] shrink-0 fill-[#ffdb3c]/10 animate-pulse" />
             <span className="truncate" title={movie.recommendedFrom.join(", ")}>
               {language === "nl" ? "Aanbevolen n.a.v." : "Recommended based on"}: <strong className="text-[#ffdb3c] font-bold">{movie.recommendedFrom.join(", ")}</strong>
@@ -887,7 +887,7 @@ const CinephileCard = memo(function CinephileCard({
         )}
 
         <div className="flex items-center justify-between gap-3 mt-1 sm:mt-1.5 pointer-events-auto">
-          <div className="flex items-center gap-1.5 flex-wrap text-xs font-semibold text-slate-350 min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap text-xs font-semibold text-slate-300 min-w-0">
             <span className="px-1.5 py-0.5 bg-[#8c7fff]/15 border border-[#8c7fff]/25 text-[#cec9ff] text-[8.5px] font-extrabold rounded tracking-wider shrink-0 select-none">
               STREAM
             </span>
@@ -901,7 +901,7 @@ const CinephileCard = memo(function CinephileCard({
           </div>
           <div className="flex items-center gap-1.5 shrink-0 select-none ml-2">
             {movie.language && (
-              <span className="px-1.5 py-0.5 bg-slate-900 border border-white/5 text-slate-350 text-[9px] rounded font-sans font-semibold tracking-wide uppercase">
+              <span className="px-1.5 py-0.5 bg-slate-900 border border-white/5 text-slate-300 text-[9px] rounded font-sans font-semibold tracking-wide uppercase">
                 {movie.language}
               </span>
             )}

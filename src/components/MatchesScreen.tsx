@@ -159,7 +159,7 @@ export default function MatchesScreen({
                     </div>
                   </div>
 
-                  <p className="text-slate-310 text-slate-350 text-xs line-clamp-2 leading-relaxed italic block font-medium select-text">
+                  <p className="text-slate-300 text-xs line-clamp-2 leading-relaxed italic block font-medium select-text">
                     "{movie.synopsis}"
                   </p>
 
@@ -195,7 +195,7 @@ export default function MatchesScreen({
                       className={`flex-1 py-2 px-3 rounded-xl border transition-all duration-300 cursor-pointer select-none text-[11px] font-extrabold uppercase tracking-wide flex items-center justify-center gap-1.5 ${
                         hasMySuperLike
                           ? "bg-gradient-to-r from-pink-500 to-rose-500 border-pink-400 text-white shadow-md shadow-pink-500/25 hover:brightness-110 active:scale-95"
-                          : "bg-pink-550/10 border-pink-500/20 text-pink-400 hover:bg-pink-500/20 active:scale-95"
+                          : "bg-pink-500/10 border-pink-500/20 text-pink-400 hover:bg-pink-500/20 active:scale-95"
                       }`}
                       title={language === "nl" ? "Geef een extra hartje!" : "Give an extra heart!"}
                     >
@@ -207,7 +207,7 @@ export default function MatchesScreen({
                     <button
                       type="button"
                       onClick={() => onRemoveMatch(movie.id)}
-                      className="py-2 px-3 bg-red-500/10 hover:bg-red-500/20 text-red-450 hover:text-red-400 text-[11px] font-bold border border-red-500/15 rounded-xl transition-all cursor-pointer select-none uppercase tracking-wider shrink-0"
+                      className="py-2 px-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 text-[11px] font-bold border border-red-500/15 rounded-xl transition-all cursor-pointer select-none uppercase tracking-wider shrink-0"
                       title={isSolo
                         ? (language === "nl" ? "Verwijder uit Favorieten" : "Remove from Favorites")
                         : (language === "nl" ? "Verwijder voor iedereen" : "Remove for everyone")}

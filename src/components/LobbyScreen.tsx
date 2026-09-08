@@ -157,7 +157,7 @@ export default function LobbyScreen({ room, currentUserId, onStartSwiping, onLea
             className="w-full inline-flex items-center justify-center gap-2 py-4 px-6 rounded-full glow-button text-white font-extrabold shadow-lg active:scale-[0.98] transition-all cursor-pointer"
           >
             <Play className="w-4 h-4 fill-white text-white shrink-0" />
-            {t("start_swiping")}
+            {hasPartner ? t("start_swiping_ready") : t("start_swiping_unready")}
             {hasPartner && (
               <span className="flex items-center gap-0.5 ml-1.5 text-[9px] px-2 py-0.5 rounded-full bg-black/30 text-[#ffdb3c] font-black uppercase tracking-widest border border-[#ffdb3c]/30 animate-pulse">
                 <Sparkles className="w-3 h-3 text-[#ffdb3c] fill-[#ffdb3c]" />

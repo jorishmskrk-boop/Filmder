@@ -8,6 +8,8 @@ import NodeCache from "node-cache";
 dotenv.config();
 
 const app = express();
+// This app runs behind exactly one reverse proxy hop (the Cloud Run / hosting front-end),
+// so "1" is the correct trust-proxy depth for reading a real client IP from X-Forwarded-For.
 app.set("trust proxy", 1);
 app.use(express.json());
 
@@ -72,7 +74,9 @@ const movieLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Te veel verzoeken. Probeer het over een minuut opnieuw." },
-  validate: { trustProxy: false, xForwardedForHeader: false }
+  // Let express-rate-limit run its built-in check that "trust proxy" and the incoming
+  // headers are actually consistent, instead of silently trusting a misconfiguration
+  // (which could let a client spoof its IP and dodge the limiter entirely).
 });
 
 const movieCache = new NodeCache({ stdTTL: 86450, checkperiod: 600 }); // ~24h TTL
@@ -210,34 +214,24 @@ app.post("/api/movies", movieLimiter, async (req, res) => {
 
     const genresString = selectedVibe.trim() ? selectedVibe.trim().replace(/,/g, "|") : "";
 
-    // Calculate a dynamic upper bound for pagination
-    let safeMaxPage = 20;
-    if (hasUserYearFilter || hasUserGenreFilter) {
-      safeMaxPage = 3;
-    } else if (providerIdString.length > 0) {
-      safeMaxPage = 10;
-    }
-
-    // Build the query URLs
+    // Build the query URLs (page is intentionally omitted here — fetchRandomPage below
+    // samples a page from the query's REAL result range instead of a guessed one)
     const baseQuery = `https://api.themoviedb.org/3/discover/movie?api_key=${tmdbKey}&watch_region=${selectedCountry}`;
     const providerFilter = providerIdString ? `&with_watch_providers=${providerIdString}` : "";
     const genreFilter = genresString ? `&with_genres=${genresString}` : "";
 
     // Query 1 (Random Year Era)
     const randomYear = Math.floor(Math.random() * (2023 - 1985 + 1)) + 1985;
-    const page1 = Math.floor(Math.random() * 3) + 1;
     const q1Custom = appendUserFilters(`&primary_release_year=${randomYear}&sort_by=popularity.desc&vote_count.gte=300`);
-    const url1 = `${baseQuery}&page=${page1}${q1Custom}${providerFilter}${genreFilter}`;
+    const url1 = `${baseQuery}${q1Custom}${providerFilter}${genreFilter}`;
 
     // Query 2 (Random Sort Method)
     const sorts = ["revenue.desc", "vote_count.desc", "popularity.desc"];
     const selectedSort = sorts[Math.floor(Math.random() * sorts.length)];
-    const page2 = Math.floor(Math.random() * safeMaxPage) + 1;
     const q2Custom = appendUserFilters(`&sort_by=${selectedSort}&vote_count.gte=400`);
-    const url2 = `${baseQuery}&page=${page2}${q2Custom}${providerFilter}${genreFilter}`;
+    const url2 = `${baseQuery}${q2Custom}${providerFilter}${genreFilter}`;
 
     // Query 3 (Blind Genre Injection / Cult Classics)
-    const page3 = Math.floor(Math.random() * safeMaxPage) + 1;
     const q3Custom = appendUserFilters("&sort_by=vote_average.desc&vote_average.gte=6.5&vote_count.gte=200&vote_count.lte=3000");
     let url3 = "";
     if (!hasUserGenreFilter) {
@@ -247,47 +241,56 @@ app.post("/api/movies", movieLimiter, async (req, res) => {
       const shuffledGenres = [...secondaryGenres].sort(() => 0.5 - Math.random());
       const numGenres = Math.floor(Math.random() * 3) + 1; // Pick 1, 2 or 3 random genres
       const selectedCombo = shuffledGenres.slice(0, numGenres).join("|");
-      url3 = `${baseQuery}&page=${page3}${q3Custom}${providerFilter}&with_genres=${selectedCombo}`;
+      url3 = `${baseQuery}${q3Custom}${providerFilter}&with_genres=${selectedCombo}`;
     } else {
-      url3 = `${baseQuery}&page=${page3}${q3Custom}${providerFilter}${genreFilter}`;
+      url3 = `${baseQuery}${q3Custom}${providerFilter}${genreFilter}`;
     }
 
-    // Helper to fetch and return tmdb items safely
-    const fetchQuery = async (url: string): Promise<TMDBItem[]> => {
+    // TMDB itself never paginates past page 500
+    const TMDB_MAX_PAGE = 500;
+
+    // Helper to fetch a genuinely random page of a discover query. Instead of guessing a
+    // small page window up front (which kept resurfacing the same handful of popular movies),
+    // this probes page 1 to learn the query's REAL total_pages, then samples a random page
+    // across that full range so the whole catalogue matching the filters is in play.
+    const fetchRandomPage = async (urlWithoutPage: string): Promise<TMDBItem[]> => {
       try {
-        const res = await fetch(url);
+        const probeRes = await fetch(`${urlWithoutPage}&page=1`);
+        if (!probeRes.ok) return [];
+        const probeData = await probeRes.json() as TMDBResponse;
+        const page1Results = probeData.results || [];
+        const totalPages = Math.min(probeData.total_pages || 1, TMDB_MAX_PAGE);
+
+        if (totalPages <= 1) {
+          return page1Results;
+        }
+
+        const randomPage = Math.floor(Math.random() * totalPages) + 1;
+        if (randomPage === 1) {
+          return page1Results;
+        }
+
+        const res = await fetch(`${urlWithoutPage}&page=${randomPage}`);
         if (res.ok) {
           const data = await res.json() as TMDBResponse;
           const results = data.results || [];
-          if (results.length > 0) {
-            return results;
-          }
+          if (results.length > 0) return results;
         }
-      } catch (err) {
-        console.error(`Error fetching movie query url (${url}):`, err);
-      }
 
-      // If page is greater than 1, and we got 0 results (or failed), attempt page 1 fallback for this EXACT query
-      if (url.includes("&page=") && !url.includes("&page=1")) {
-        const fallbackUrl = url.replace(/&page=\d+/, "&page=1");
-        try {
-          const res = await fetch(fallbackUrl);
-          if (res.ok) {
-            const data = await res.json() as TMDBResponse;
-            return data.results || [];
-          }
-        } catch (err) {
-          console.error(`Error fetching fallback page 1 for (${fallbackUrl}):`, err);
-        }
+        // Random page came back empty/failed (can happen near the tail) — fall back to the
+        // page 1 results we already fetched rather than returning nothing for this query.
+        return page1Results;
+      } catch (err) {
+        console.error(`Error fetching random discover page (${urlWithoutPage}):`, err);
+        return [];
       }
-      return [];
     };
 
     // Parallel execution
     const resultsArrays = await Promise.all([
-      fetchQuery(url1),
-      fetchQuery(url2),
-      fetchQuery(url3)
+      fetchRandomPage(url1),
+      fetchRandomPage(url2),
+      fetchRandomPage(url3)
     ]);
 
     // Data Processing & Deduplication

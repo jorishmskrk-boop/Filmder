@@ -77,7 +77,7 @@ export default function TrailerModal({ url, onClose }: TrailerModalProps) {
                 href={url}
                 target="_blank"
                 rel="noreferrer"
-                className="py-3 px-6 rounded-full bg-red-655 hover:bg-gradient-to-br hover:from-red-600 hover:to-red-700 text-white font-extrabold tracking-wider transition-all cursor-pointer inline-flex items-center gap-2"
+                className="py-3 px-6 rounded-full bg-red-600 hover:bg-gradient-to-br hover:from-red-600 hover:to-red-700 text-white font-extrabold tracking-wider transition-all cursor-pointer inline-flex items-center gap-2"
               >
                 {language === "nl" ? "Open op YouTube" : "Open on YouTube"}
               </a>

@@ -1,20 +1,24 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Filmder
 
-# Run and deploy your AI Studio app
+Swipe samen met je partner of vrienden door films en vind in real-time een match voor je filmavond — Tinder, maar dan voor films. Maak een lobby aan, deel de code, en swipe allebei door een gedeelde stapel films. Zodra jullie dezelfde film liken, is het een match.
 
-This contains everything you need to run your app locally.
+- Filmdata (poster, synopsis, genres, trailer, streamingdiensten) komt van [TMDB](https://www.themoviedb.org/).
+- IMDb-scores worden opgehaald via [OMDb](https://www.omdbapi.com/) (met automatische fallback naar de TMDB-score als het daglimiet bereikt is).
+- Lobby's en realtime swipe-synchronisatie draaien op Firebase (Firestore + anonieme auth).
 
-View your app in AI Studio: https://ai.studio/apps/bf46a2c2-8d00-46dd-9dfd-7bfe614d7896
+## Lokaal draaien
 
-## Run Locally
+**Vereisten:** Node.js
 
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
+1. Installeer dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
+2. Zet `TMDB_API_KEY` (verplicht) en optioneel `OMDB_API_KEY` in `.env` — zie [.env.example](.env.example).
+3. Start de app:
    `npm run dev`
+
+## Scripts
+
+- `npm run dev` — start de dev-server (Express + Vite middleware)
+- `npm run build` — bouwt de frontend en bundelt de server voor productie
+- `npm run start` — start de gebouwde productie-server
+- `npm run lint` — TypeScript type-check

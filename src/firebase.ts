@@ -19,6 +19,26 @@ export const auth = getAuth();
 // Helper function to resolve room document path
 export const getRoomRef = (code: string) => doc(db, 'artifacts', 'flixmatch-default-id', 'public', 'data', 'rooms', code);
 
+// Room documents set their own expiresAt (24h from creation) but nothing deletes them on the
+// server automatically unless a Firestore TTL policy is configured on that field in the console.
+// Until that's set up, treat an expired room as gone client-side so it can't be joined/used.
+export function isRoomExpired(expiresAt: unknown): boolean {
+  if (!expiresAt) return false;
+
+  let ms: number;
+  if (typeof expiresAt === 'string') {
+    ms = new Date(expiresAt).getTime();
+  } else if (expiresAt instanceof Date) {
+    ms = expiresAt.getTime();
+  } else if (typeof (expiresAt as { toMillis?: () => number }).toMillis === 'function') {
+    ms = (expiresAt as { toMillis: () => number }).toMillis();
+  } else {
+    return false;
+  }
+
+  return !isNaN(ms) && ms < Date.now();
+}
+
 export enum OperationType {
   CREATE = 'create',
   UPDATE = 'update',
