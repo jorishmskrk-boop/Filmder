@@ -31,7 +31,9 @@ interface TMDBResponse {
   total_pages?: number;
 }
 
-// Map of providers to TMDB IDs
+// Map of providers to TMDB IDs (verified against TMDB's /watch/providers/movie?watch_region=NL —
+// videoland/npostart/viaplay/skyshowtime previously pointed at wrong or nonexistent TMDB provider
+// ids: viaplay's old id 563 is actually KPN, silently returning KPN's catalogue instead of Viaplay's)
 const PROVIDER_MAP: Record<string, number> = {
   netflix: 8,
   disney: 337,
@@ -40,10 +42,10 @@ const PROVIDER_MAP: Record<string, number> = {
   apple: 350,
   hulu: 15,
   paramount: 531,
-  videoland: 153,
-  npostart: 326,
-  viaplay: 563,
-  skyshowtime: 1796,
+  videoland: 72,
+  npostart: 360,
+  viaplay: 76,
+  skyshowtime: 1773,
 };
 
 // Map of ISO 639-1 language codes to human-readable Dutch names
