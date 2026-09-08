@@ -220,9 +220,12 @@ app.post("/api/movies", movieLimiter, async (req, res) => {
     const providerFilter = providerIdString ? `&with_watch_providers=${providerIdString}` : "";
     const genreFilter = genresString ? `&with_genres=${genresString}` : "";
 
-    // Query 1 (Random Year Era)
+    // Query 1 (Random Year Era) — only pick a random era when the user hasn't set their own
+    // year/decade filter; primary_release_year and appendUserFilters' primary_release_date
+    // range would otherwise both apply and almost never overlap, silently zeroing this query out.
     const randomYear = Math.floor(Math.random() * (2023 - 1985 + 1)) + 1985;
-    const q1Custom = appendUserFilters(`&primary_release_year=${randomYear}&sort_by=popularity.desc&vote_count.gte=300`);
+    const yearEraFilter = hasUserYearFilter ? "" : `&primary_release_year=${randomYear}`;
+    const q1Custom = appendUserFilters(`${yearEraFilter}&sort_by=popularity.desc&vote_count.gte=300`);
     const url1 = `${baseQuery}${q1Custom}${providerFilter}${genreFilter}`;
 
     // Query 2 (Random Sort Method)
@@ -501,8 +504,9 @@ app.post("/api/movies", movieLimiter, async (req, res) => {
     // Keep up to 20 final movies for the curated swipe deck
     const finalMovies = filteredMovies.slice(0, 20);
 
-    // Fall back to original formatted movies if strict filters left too few elements
-    const moviesToReturn = finalMovies.length >= 5 ? finalMovies : formattedMovies.slice(0, 20);
+    // Only abandon the rating filter entirely if it matched NOTHING at all — a smaller but
+    // honestly-filtered deck beats silently ignoring a rating the user explicitly asked for.
+    const moviesToReturn = finalMovies.length > 0 ? finalMovies : formattedMovies.slice(0, 20);
 
     const responsePayload = { source: "TMDB", movies: moviesToReturn, fallbackLevel: activeFallbackLevel };
 
@@ -798,8 +802,9 @@ app.post("/api/recommendations", movieLimiter, async (req, res) => {
     }
 
     // Select the final movies (at most 20) before fetching OMDb ratings.
-    // If filtering left us with less than 3 movies, fallback to unfiltered formattedMovies list.
-    const chosenMoviesSource = filteredMovies.length >= 3 ? filteredMovies : formattedMovies;
+    // Only abandon the year/decade filter if it matched NOTHING — a smaller but honestly
+    // filtered deck beats silently ignoring a year range the user explicitly asked for.
+    const chosenMoviesSource = filteredMovies.length > 0 ? filteredMovies : formattedMovies;
     const finalSelectionCandidates = chosenMoviesSource.slice(0, 20);
 
     // ONLY fetch OMDb ratings for these selected final movies (at most 20)
@@ -829,7 +834,8 @@ app.post("/api/recommendations", movieLimiter, async (req, res) => {
       finalMovies = finalMovies.filter(m => m.rating <= maxRating);
     }
 
-    const moviesToReturn = finalMovies.length >= 3 ? finalMovies : cleanedMovies;
+    // Same rule here: only give up on the rating filter if literally nothing matched.
+    const moviesToReturn = finalMovies.length > 0 ? finalMovies : cleanedMovies;
 
     return res.json({ source: "TMDB_RECOMMENDATIONS", movies: moviesToReturn });
   } catch (error: any) {
